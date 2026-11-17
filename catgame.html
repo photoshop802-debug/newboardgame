@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>拾貓鍋 CAT 10 v4</title>
+<style>
+:root{ --bg:#e2f0cb; --green:#6cbe45; --orange:#ff9f43; --pot:#8b5a2b; }
+*{box-sizing:border-box;font-family:"Microsoft JhengHei","PingFang TC",sans-serif;}
+html,body{height:100%;margin:0;}
+body{background:var(--bg);overflow:hidden;user-select:none;}
+.btn{background:var(--orange);color:#fff;border:none;padding:14px 30px;font-size:clamp(18px,1.6vw,26px);border-radius:30px;cursor:pointer;font-weight:900;transition:.2s;box-shadow:0 4px 0 rgba(0,0,0,.15);}
+.btn:hover{transform:translateY(-2px);filter:brightness(1.08);}
+.btn:disabled{background:#c9c9c9 !important;cursor:not-allowed;transform:none;box-shadow:none;}
+
+/* 設定玩家 */
+#setup-screen{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#fff;padding:26px 30px;border-radius:22px;box-shadow:0 8px 24px rgba(0,0,0,.15);width:min(430px,92vw);text-align:center;max-height:94vh;overflow:auto;}
+#setup-screen h1{margin:0 0 6px;font-size:32px;}
+#setup-screen input,#setup-screen select{width:86%;padding:10px;margin:6px 0;border:2px solid #ccc;border-radius:10px;font-size:16px;text-align:center;}
+
+/* 主畫面：左玩家｜右遊戲桌 */
+#game-screen{display:none;height:100vh;padding:12px 14px;gap:16px;grid-template-columns:clamp(170px,15vw,270px) minmax(0,1fr);}
+#game-screen.on{display:grid;}
+#players-zone{display:flex;flex-direction:column;justify-content:safe center;gap:16px;min-height:0;overflow-y:auto;overflow-x:visible;padding:6px 14px 6px 4px;}
+/* 5～6 人：卡片改成精簡版，一次全部看得到 */
+#players-zone.many{gap:8px;}
+#players-zone.many .player-card{padding:5px 10px 4px;border-width:3px;border-radius:16px;}
+#players-zone.many .player-name{font-size:clamp(15px,1.25vw,21px);line-height:1.2;}
+#players-zone.many .player-score{font-size:clamp(16px,1.35vw,23px);line-height:1.2;}
+#players-zone.many .player-details{display:none;}
+#players-zone.many .pc-head{display:flex;justify-content:center;align-items:baseline;gap:10px;flex-wrap:wrap;}
+#players-zone.many .player-token-bay{margin-top:2px;height:44px;}
+body.tok-small .grand-token{transform:scale(.72);transform-origin:0 0;}
+body.tok-small .grand-token.flying{transform:scale(1.4);}
+#players-zone.many .player-card .now{display:none !important;}
+#players-zone.many .player-card.active{transform:scale(1.03) translateX(4px);}
+.player-card{
+    position:relative;background:#fff;border:4px solid #ccc;border-radius:20px;padding:12px 12px 10px;text-align:center;
+    transition:transform .35s, opacity .35s, box-shadow .35s, filter .35s;filter:saturate(.45) brightness(.98);
+}
+.player-card .player-name,.player-card .player-score{transition:opacity .35s;}
+.player-card:not(.active) .player-name,.player-card:not(.active) .player-score{opacity:.65;}
+.player-name{font-weight:900;font-size:clamp(17px,1.5vw,26px);}
+.player-score{font-size:clamp(18px,1.6vw,28px);color:#d32f2f;font-weight:900;}
+.player-details{font-size:clamp(12px,.95vw,15px);color:#666;}
+.player-token-bay{position:relative;height:60px;margin-top:6px;border-top:2px dashed #eee;}
+.player-card .now{display:none;margin-top:4px;background:var(--green);color:#fff;border-radius:12px;font-weight:900;font-size:clamp(14px,1.2vw,20px);padding:2px 0;}
+.player-card .tag{display:none;position:absolute;right:-28px;top:50%;margin-top:-22px;font-size:40px;color:var(--green);text-shadow:0 2px 0 #fff;}
+.player-card.active{opacity:1;filter:none;border-color:var(--green);background:#f0fff0;transform:scale(1.07) translateX(6px);animation:glow 1.2s infinite;z-index:31;}
+.player-card{z-index:30;}
+.player-card.active .now{display:block;animation:pulse .8s infinite alternate;}
+.player-card.active .tag{display:block;animation:nudge .7s infinite alternate;}
+@keyframes glow{0%,100%{box-shadow:0 0 0 3px #fff,0 0 14px 3px var(--green);}50%{box-shadow:0 0 0 5px #fff,0 0 34px 12px var(--green);}}
+@keyframes pulse{from{transform:scale(1);}to{transform:scale(1.06);}}
+@keyframes nudge{from{transform:translateX(0);}to{transform:translateX(8px);}}
+.bump{animation:bump .5s;}
+@keyframes bump{0%{transform:scale(1);}40%{transform:scale(1.5);}100%{transform:scale(1);}}
+
+#main{display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0;}
+.game-table{
+    flex:1;min-height:0;display:grid;grid-template-columns:clamp(150px,14vw,230px) minmax(0,1fr) clamp(200px,19vw,320px);gap:14px;
+    background:#fffdf0;border:6px solid var(--pot);border-radius:28px;padding:16px;box-shadow:inset 0 0 24px rgba(0,0,0,.1);
+}
+.pile-zone{display:flex;flex-direction:column;justify-content:space-around;align-items:center;}
+.pile{
+    width:clamp(110px,10vw,170px);aspect-ratio:1;border-radius:50%;border:5px dashed #aaa;display:flex;flex-direction:column;
+    justify-content:center;align-items:center;font-weight:900;font-size:clamp(15px,1.3vw,22px);background:#eee;color:#777;
+}
+.pile b{font-size:1.6em;}
+.pile.active-deck{border-style:solid;border-color:var(--pot);background:radial-gradient(circle at 35% 30%,#ffe7c7,#f0c58f);color:var(--pot);cursor:pointer;box-shadow:0 6px 0 #c59055,0 10px 18px rgba(0,0,0,.2);transition:transform .15s;}
+.pile.active-deck:hover{transform:translateY(-4px) scale(1.04);}
+.pile.active-deck:active{transform:translateY(2px) scale(.97);}
+
+/* 中央算式 */
+.pot-zone{display:flex;flex-direction:column;align-items:center;justify-content:center;border-left:3px dashed #e6dcc4;border-right:3px dashed #e6dcc4;min-width:0;}
+#pot-title{font-size:clamp(18px,1.6vw,28px);font-weight:900;color:#8b5a2b;margin-bottom:10px;}
+#equation{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:clamp(6px,.8vw,14px);width:100%;padding:8px;}
+.op{font-size:calc(var(--cs) * .55);font-weight:900;color:#5d4037;line-height:1;}
+.op.eq{color:#d35400;}
+.q{
+    width:var(--cs);height:var(--cs);border-radius:50%;border:5px dashed #d35400;display:flex;align-items:center;justify-content:center;
+    font-size:calc(var(--cs) * .5);font-weight:900;color:#d35400;background:#fff6e6;
+}
+.cat-card{width:var(--cs);height:var(--cs);perspective:600px;}
+.cat-card .inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .55s cubic-bezier(.3,1.5,.5,1);}
+.cat-card.flipped .inner{transform:rotateY(180deg);}
+.cat-card .face{position:absolute;inset:0;border-radius:50%;backface-visibility:hidden;-webkit-backface-visibility:hidden;display:flex;align-items:center;justify-content:center;}
+.cat-card .back{background:radial-gradient(circle at 35% 30%,#ffd28a,#e0a050);border:5px solid #8b5a2b;font-size:calc(var(--cs) * .45);}
+.cat-card .front{transform:rotateY(180deg);background:#fdf5e6;border:calc(var(--cs) * .06) solid currentColor;box-shadow:0 6px 10px rgba(0,0,0,.15);}
+.cat-card .front::before{content:"🐱";position:absolute;font-size:calc(var(--cs) * .4);opacity:.2;bottom:6%;}
+.cat-card .num{position:relative;font-size:calc(var(--cs) * .62);font-weight:900;line-height:1;text-shadow:-2px -2px 0 #fff,2px -2px 0 #fff,-2px 2px 0 #fff,2px 2px 0 #fff;}
+.cat-1{color:#ff4d4d;} .cat-2{color:#ff9f43;} .cat-3{color:#0abde3;} .cat-4{color:#10ac84;} .cat-5{color:#5f27cd;} .cat-6{color:#ee5253;}
+#pot-hint{font-size:clamp(18px,1.6vw,28px);color:#b08a5a;font-weight:bold;}
+.pot-zone.boom{animation:shakeX .5s 2;}
+@keyframes shakeX{0%,100%{transform:translateX(0);}25%{transform:translateX(-14px);}75%{transform:translateX(14px);}}
+
+/* 右側：貓咪卡 + 答案 + 特盛公區 */
+.dice-zone{display:flex;flex-direction:column;align-items:center;justify-content:space-around;gap:6px;}
+#cat-box{display:flex;flex-direction:column;align-items:center;cursor:pointer;}
+#dice-canvas{width:clamp(110px,9vw,160px);height:clamp(110px,9vw,160px);transition:transform .15s;}
+#cat-box:hover #dice-canvas{transform:scale(1.06) rotate(-3deg);}
+#cat-tip{font-size:clamp(12px,1vw,16px);color:#999;font-weight:bold;}
+#dice-result-text{font-weight:900;font-size:clamp(15px,1.3vw,22px);min-height:1.3em;color:#e91e63;text-align:center;}
+#answer{
+    width:90%;border-radius:18px;border:4px dashed #d9c7a8;background:#fff;text-align:center;padding:8px 4px;
+    font-size:clamp(18px,1.6vw,28px);font-weight:900;color:#8b5a2b;
+}
+#answer b{font-size:1.6em;color:var(--orange);}
+#answer.show{border-style:solid;border-color:var(--orange);animation:bump .5s;}
+.pool-label{font-size:clamp(13px,1.1vw,18px);font-weight:900;color:#8b5a2b;}
+#public-token-pool{position:relative;width:186px;height:60px;}
+
+/* 特盛圓片 */
+.grand-token{
+    width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#ff4d4d,#cc0000);border:3px solid #ffeb3b;
+    box-shadow:0 4px 6px rgba(0,0,0,.3);display:flex;flex-direction:column;justify-content:center;align-items:center;color:#fff;font-weight:bold;
+    position:absolute;transition:all 1.2s cubic-bezier(.25,.8,.25,1);z-index:50;
+}
+.grand-token .tk-top{font-size:12px;color:#fff9c4;font-weight:900;line-height:1;text-shadow:1px 1px 1px #000;}
+.grand-token .tk-mid{font-size:14px;font-weight:900;margin:-1px 0;text-shadow:1px 1px 1px #000;}
+.grand-token .tk-btm{font-size:10px;background:#ffe082;color:#5d4037;border-radius:3px;padding:0 3px;}
+.grand-token.flying{transform:scale(1.8);box-shadow:0 0 30px 10px #ffeb3b;}
+
+.control-panel{display:flex;justify-content:center;gap:18px;flex:none;}
+
+/* 特效、橫幅、彈窗 */
+#fx-container{position:fixed;inset:0;pointer-events:none;z-index:800;overflow:hidden;}
+#banner{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:900;}
+#banner .ban{
+    background:var(--bc,#6cbe45);color:#fff;text-align:center;font-size:clamp(34px,4.6vw,80px);font-weight:900;padding:22px 56px;border-radius:60px;
+    border:8px solid #fff;box-shadow:0 20px 60px rgba(0,0,0,.35);text-shadow:0 4px 0 rgba(0,0,0,.25);transform:translateX(-130vw);
+}
+#banner .ban small{display:block;font-size:.5em;margin-top:6px;}
+#banner.show .ban{animation:banner var(--bd,1.6s) cubic-bezier(.2,.9,.3,1) forwards;}
+@keyframes banner{0%{transform:translateX(-130vw) rotate(-6deg);}18%{transform:translateX(0) rotate(2deg) scale(1.06);}28%{transform:translateX(0) rotate(0) scale(1);}82%{transform:translateX(0);}100%{transform:translateX(130vw) rotate(6deg);}}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);justify-content:center;align-items:center;z-index:1000;}
+.modal-content{background:#fff;padding:26px;border-radius:20px;text-align:center;width:min(520px,92vw);}
+.modal-content h3{font-size:22px;}
+.target-btn{display:block;width:100%;margin:10px 0;padding:14px;font-size:20px;font-weight:bold;border-radius:12px;border:2px solid #ccc;background:#f9f9f9;cursor:pointer;}
+.target-btn:hover{background:#e6f7ff;border-color:#1890ff;}
+#end-list{text-align:left;font-size:20px;line-height:1.9;margin:12px 0;}
+/* 貓咪對話框 */
+.dice-zone{position:relative;}
+#cat-bubble{
+    position:absolute;right:calc(100% - 40px);top:0;z-index:30;width:clamp(240px,22vw,380px);display:none;
+    background:#fff;border:5px solid #ff9f43;border-radius:24px;padding:14px 18px;font-size:clamp(18px,1.6vw,26px);font-weight:900;color:#5d4037;
+    box-shadow:0 8px 20px rgba(0,0,0,.2);
+}
+#cat-bubble::after{content:'';position:absolute;right:-26px;top:40px;border:13px solid transparent;border-left-color:#ff9f43;}
+#cat-bubble.warn{border-color:#e53935;color:#b71c1c;}
+#cat-bubble.warn::after{border-left-color:#e53935;}
+#cat-bubble.go{border-color:#43a047;color:#1b5e20;}
+#cat-bubble.go::after{border-left-color:#43a047;}
+#cat-bubble.on{display:block;animation:bubbleIn .5s cubic-bezier(.3,1.6,.5,1);}
+@keyframes bubbleIn{0%{transform:scale(.3);opacity:0;}100%{transform:scale(1);opacity:1;}}
+
+/* 立體貓骰 */
+#dice3d-layer{position:fixed;inset:0;z-index:850;pointer-events:none;display:none;perspective:1300px;background:rgba(0,0,0,.25);}
+#dice3d-layer.on{display:block;}
+#dice3d-pos{position:absolute;left:50%;top:46%;--d:clamp(170px,15vw,260px);width:var(--d);height:var(--d);margin:calc(var(--d) / -2) 0 0 calc(var(--d) / -2);transform-style:preserve-3d;}
+#dice3d-tilt{width:100%;height:100%;transform-style:preserve-3d;transform:rotateX(-20deg) rotateY(28deg);}
+#dice3d{width:100%;height:100%;position:relative;transform-style:preserve-3d;}
+.dface{
+    position:absolute;inset:0;border-radius:16%;display:flex;align-items:center;justify-content:center;
+    background:repeating-linear-gradient(100deg,rgba(150,95,40,.0) 0 14px,rgba(150,95,40,.12) 14px 17px),linear-gradient(135deg,#f3d8a6,#d7a965);
+    box-shadow:inset 0 0 0 4px #c8955a,inset 0 0 26px rgba(120,70,20,.35);
+}
+.dface .disc{width:72%;height:72%;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-weight:900;
+    font-size:calc(var(--d) * .3);font-family:Arial,sans-serif;box-shadow:inset 0 -6px 0 rgba(0,0,0,.2),0 3px 6px rgba(0,0,0,.25);border:4px solid #fff;}
+.dface .disc.blue{background:#1e88e5;} .dface .disc.green{background:#43a047;} .dface .disc.red{background:#e53935;}
+.dface .disc.pot{background:radial-gradient(circle at 40% 35%,#ffe082,#ff9f43);color:#c62828;font-size:calc(var(--d) * .11);line-height:1.1;}
+.dface .disc.pot .p{font-size:calc(var(--d) * .2);}
+/* 骰子停下後：結果面發亮 */
+.dface.win{box-shadow:inset 0 0 0 7px #fff59d,inset 0 0 30px rgba(255,235,59,.9);}
+#dice-glow{position:absolute;left:50%;top:46%;width:clamp(300px,27vw,460px);aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;opacity:0;
+    background:radial-gradient(circle,rgba(255,245,157,1) 0%,rgba(255,214,0,.8) 35%,rgba(255,214,0,0) 70%);}
+#dice-glow.on{animation:glowPulse .7s infinite alternate;}
+@keyframes glowPulse{from{opacity:.65;transform:translate(-50%,-50%) scale(.9);}to{opacity:1;transform:translate(-50%,-50%) scale(1.12);}}
+@keyframes faceGlow{from{box-shadow:inset 0 0 0 4px #c8955a,0 0 0 5px #fff59d,0 0 30px 12px #ffeb3b;}to{box-shadow:inset 0 0 0 4px #c8955a,0 0 0 8px #fff,0 0 70px 30px #ffd600;}}
+@keyframes discPop{from{transform:scale(1);}to{transform:scale(1.08);}}
+#dice-rule{position:absolute;left:50%;top:calc(46% + 225px);transform:translateX(-50%);background:#fff;border:5px solid #ff9f43;border-radius:22px;padding:10px 26px;
+    font-size:clamp(22px,2.1vw,36px);font-weight:900;color:#5d4037;white-space:nowrap;opacity:0;box-shadow:0 8px 20px rgba(0,0,0,.3);}
+#dice-shadow{position:absolute;left:50%;top:calc(46% + 120px);width:220px;height:40px;margin-left:-110px;border-radius:50%;background:radial-gradient(rgba(0,0,0,.45),transparent 70%);}
+#dice-result-big{position:absolute;left:50%;top:calc(46% + 160px);transform:translateX(-50%);font-size:clamp(30px,3vw,54px);font-weight:900;color:#fff;
+    text-shadow:0 3px 0 #b71c1c,0 0 14px #000;opacity:0;white-space:nowrap;}
+
+/* 搶牌展示 */
+#steal-overlay{display:none;position:fixed;inset:0;z-index:860;background:rgba(40,25,10,.82);flex-direction:column;align-items:center;justify-content:center;gap:24px;}
+#steal-overlay.on{display:flex;}
+#steal-title{font-size:clamp(28px,3vw,52px);font-weight:900;color:#fff;text-shadow:0 3px 0 rgba(0,0,0,.4);text-align:center;}
+#steal-cards{display:flex;gap:30px;--cs:clamp(130px,12vw,200px);min-height:var(--cs);}
+#steal-total{font-size:clamp(24px,2.4vw,42px);font-weight:900;color:#ffeb3b;text-shadow:0 3px 0 rgba(0,0,0,.4);min-height:1.3em;}
+/* 選牌丟掉 */
+#pick-cards{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin:12px 0;--cs:80px;}
+#pick-cards .cat-card{cursor:pointer;transition:transform .15s;}
+#pick-cards .cat-card:hover{transform:translateY(-4px);}
+#pick-cards .cat-card.sel{transform:scale(.9);opacity:.45;}
+#pick-cards .cat-card.sel .front{box-shadow:0 0 0 6px #e53935;}
+/* ================= 小貓吉祥物 ================= */
+body.has-mcat #main{padding-top:calc(var(--mw,150px) * .72);transition:padding .6s;}
+#mcat{position:fixed;left:-300px;top:0;z-index:700;width:var(--mw,150px);height:calc(var(--mw,150px) * .8);cursor:grab;touch-action:none;}
+#mcat.hiding{z-index:25;}
+#mcat.dragging{cursor:grabbing;z-index:990;}
+#mcat .mc-flip{width:100%;height:100%;transform:scale(calc(var(--sx,1) * var(--k,1)),calc(var(--sy,1) * var(--k,1)));transform-origin:50% 90%;transition:transform .25s;}
+#mcat svg{width:100%;height:100%;overflow:visible;display:block;}
+#mcat .mc-bubble{position:absolute;left:50%;bottom:100%;transform:translateX(-50%);background:#fff;border:3px solid #ff9f43;border-radius:16px;padding:4px 12px;
+    font-size:clamp(15px,1.3vw,22px);font-weight:900;color:#5d4037;white-space:nowrap;box-shadow:0 4px 10px rgba(0,0,0,.2);opacity:0;pointer-events:none;transition:opacity .2s;}
+#mcat .mc-bubble.on{opacity:1;}
+/* 漫畫式小尖角：預設在上方，尖角朝下指向貓 */
+#mcat .mc-bubble::before,#mcat .mc-bubble::after{content:'';position:absolute;border:solid transparent;}
+#mcat .mc-bubble.up{margin-bottom:12px;}
+#mcat .mc-bubble.up::before{left:50%;top:100%;margin-left:-11px;border-width:12px 11px 0;border-top-color:#ff9f43;}
+#mcat .mc-bubble.up::after{left:50%;top:100%;margin-left:-7px;margin-top:-1px;border-width:8px 7px 0;border-top-color:#fff;}
+/* 貓在最上面時：對話框放在貓的右邊或左邊，尖角指向貓 */
+#mcat .mc-bubble.side-r,#mcat .mc-bubble.side-l{bottom:auto;top:18%;transform:none;}
+#mcat .mc-bubble.side-r{left:calc(100% + 4px);margin-left:14px;}
+#mcat .mc-bubble.side-l{left:auto;right:calc(100% + 4px);margin-right:14px;}
+#mcat .mc-bubble.side-r::before{right:100%;top:50%;margin-top:-11px;border-width:11px 14px 11px 0;border-right-color:#ff9f43;}
+#mcat .mc-bubble.side-r::after{right:100%;top:50%;margin-top:-7px;margin-right:-2px;border-width:7px 10px 7px 0;border-right-color:#fff;}
+#mcat .mc-bubble.side-l::before{left:100%;top:50%;margin-top:-11px;border-width:11px 0 11px 14px;border-left-color:#ff9f43;}
+#mcat .mc-bubble.side-l::after{left:100%;top:50%;margin-top:-7px;margin-left:-2px;border-width:7px 0 7px 10px;border-left-color:#fff;}
+#mcat .pose,#mcat .hf,#mcat .pawUp,#mcat .spikes,#mcat .eC,#mcat .eH,#mcat .eS,#mcat .eA,#mcat .mO,#mcat .mT{display:none;}
+#mcat.p-walk .pw,#mcat.p-sit .ps,#mcat.p-sleep .pz,#mcat.p-hang .ph{display:inline;}
+#mcat.look .hf{display:inline;} #mcat.look .hs{display:none;}
+#mcat.lickpaw .pawUp{display:inline;} #mcat.lickpaw .pawR{display:none;}
+#mcat.e-closed .eN,#mcat.e-happy .eN,#mcat.e-scared .eN,#mcat.e-angry .eN{display:none;}
+#mcat.e-closed .eC,#mcat.e-happy .eH,#mcat.e-scared .eS,#mcat.e-angry .eA{display:inline;}
+#mcat.e-scared .spikes{display:inline;}
+#mcat.m-open .mN{display:none;} #mcat.m-open .mO{display:inline;}
+#mcat.m-tongue .mT{display:inline;}
+#mcat .leg{transform-box:fill-box;transform-origin:50% 6%;}
+#mcat.walking .legA{animation:legA .34s infinite alternate ease-in-out;}
+#mcat.walking .legB{animation:legB .34s infinite alternate ease-in-out;}
+#mcat.walking .pwBody{animation:bob .17s infinite alternate;}
+@keyframes legA{from{transform:rotate(24deg);}to{transform:rotate(-24deg);}}
+@keyframes legB{from{transform:rotate(-24deg);}to{transform:rotate(24deg);}}
+@keyframes bob{from{transform:translateY(0);}to{transform:translateY(-3px);}}
+#mcat .tailW{transform-box:view-box;transform-origin:52px 98px;animation:tailA 1.5s infinite alternate ease-in-out;}
+#mcat .tailS{transform-box:view-box;transform-origin:128px 142px;animation:tailA 1.8s infinite alternate ease-in-out;}
+@keyframes tailA{from{transform:rotate(-10deg);}to{transform:rotate(12deg);}}
+#mcat .sleepBody{transform-box:view-box;transform-origin:110px 156px;animation:sleepB 2.6s infinite ease-in-out;}
+@keyframes sleepB{0%,100%{transform:scale(1,1);}50%{transform:scale(1.03,1.08);}}
+#mcat .ph{transform-box:view-box;transform-origin:100px 8px;animation:hang .5s infinite alternate ease-in-out;}
+@keyframes hang{from{transform:rotate(-9deg);}to{transform:rotate(9deg);}}
+#mcat .tongue{transform-box:fill-box;transform-origin:50% 0;animation:tongue .3s infinite alternate;}
+@keyframes tongue{from{transform:scaleY(.3);}to{transform:scaleY(1.25);}}
+#mcat .pawUp{transform-box:view-box;transform-origin:112px 128px;animation:pawLick .45s infinite alternate ease-in-out;}
+@keyframes pawLick{from{transform:rotate(-8deg);}to{transform:rotate(6deg);}}
+#mcat .hfs{transform-box:view-box;transform-origin:0 0;}
+#mcat.e-scared .ps{animation:shiver .06s infinite alternate;}
+@keyframes shiver{from{transform:translateX(-2px);}to{transform:translateX(2px);}}
+.mc-z{position:fixed;z-index:701;font-weight:900;color:#3a86ff;pointer-events:none;text-shadow:0 2px 0 #fff;}
+#mute-btn{position:fixed;top:12px;right:14px;z-index:950;width:50px;height:50px;border-radius:50%;border:none;background:#fff;font-size:24px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.2);}
+</style>
+</head>
+<body>
+
+<button id="mute-btn" title="聲音 / 語音 開關" onclick="toggleMute()">🔊</button>
+
+<div id="setup-screen">
+    <h1>🐱 拾貓鍋 CAT 10 🍲</h1>
+    <label for="player-count">選擇玩家人數 (2-6人)：</label><br>
+    <select id="player-count" onchange="generateNameInputs()">
+        <option value="2">2 人</option><option value="3" selected>3 人</option><option value="4">4 人</option>
+        <option value="5">5 人</option><option value="6">6 人</option>
+    </select>
+    <div id="name-inputs-container"></div>
+    <button class="btn" onclick="startGame()">開鍋喵！</button>
+</div>
+
+<div id="game-screen">
+    <div id="players-zone"></div>
+    <div id="main">
+        <div class="game-table">
+            <div class="pile-zone">
+                <div class="pile active-deck" id="deck-pile" onclick="playerDrawCard()">抽牌堆<b id="deck-count">80</b></div>
+                <div class="pile" id="discard-pile">棄牌堆<b id="discard-count">0</b></div>
+            </div>
+            <div class="pot-zone" id="pot-zone">
+                <div id="pot-title">🍲 鍋子裡的貓牌</div>
+                <div id="equation"></div>
+            </div>
+            <div class="dice-zone">
+                <div id="cat-bubble"></div>
+                <div id="cat-box" onclick="revealAnswer()">
+                    <canvas id="dice-canvas" width="200" height="200"></canvas>
+                    <div id="cat-tip">👆 點貓咪看答案</div>
+                </div>
+                <div id="dice-result-text"></div>
+                <div id="answer">總和 = <b>?</b></div>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+                    <div class="pool-label">🏆 特盛圓片（10分）</div>
+                    <div id="public-token-pool"></div>
+                </div>
+            </div>
+        </div>
+        <div class="control-panel">
+            <button class="btn" id="btn-draw" onclick="playerDrawCard()">繼續翻牌 (抽)</button>
+            <button class="btn" id="btn-collect" style="background:#4caf50;" onclick="playerCollectPot()">見好就收 (回收)</button>
+            <button class="btn" id="btn-dice" style="background:#e91e63;" onclick="triggerDiceDuel()">決勝點！擲貓骰</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="interaction-modal">
+    <div class="modal-content"><h3 id="modal-title">請選擇目標</h3><div id="modal-options"></div></div>
+</div>
+<div class="modal" id="end-modal">
+    <div class="modal-content">
+        <h2 style="margin:0;">🏁 遊戲結束！</h2>
+        <div id="end-list"></div>
+        <button class="btn" onclick="location.reload()">再玩一局</button>
+    </div>
+</div>
+<div id="banner"><div class="ban" id="banner-box"></div></div>
+<div id="dice3d-layer">
+    <div id="dice-shadow"></div>
+    <div id="dice-glow"></div>
+    <div id="dice3d-pos"><div id="dice3d-tilt"><div id="dice3d"></div></div></div>
+    <div id="dice-result-big"></div>
+    <div id="dice-rule"></div>
+</div>
+<div id="steal-overlay"><div id="steal-title"></div><div id="steal-cards"></div><div id="steal-total"></div></div>
+<div class="modal" id="pick-modal">
+    <div class="modal-content" style="width:min(760px,94vw);">
+        <h3 id="pick-title">請選 2 張要丟掉的牌</h3>
+        <div id="pick-cards"></div>
+        <button class="btn" id="pick-ok" style="background:#e53935;" disabled>確定丟掉</button>
+    </div>
+</div>
+<div id="fx-container"></div>
+
+<script>
+/* ================= 規則資料（與三版相同） ================= */
+const CARD_DISTRIBUTION = {1:19, 2:17, 3:16, 4:14, 5:8, 6:6};   // 調整版：大數少一點，共 80 張
+const DICE_FACES = ["貓鍋特盛", "2", "3", "2", "-2", "3"];
+let players = [], currentPlayerIdx = 0, deck = [], discardPile = [], currentPot = [];
+let tokenObjects = [{ id: 0, owner: -1, element: null }, { id: 1, owner: -1, element: null }, { id: 2, owner: -1, element: null }];
+let isAnimating = false, answerShown = false;
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const canvas = $("dice-canvas"), ctx = canvas.getContext("2d");
+
+/* ================= 音效（即時合成） ================= */
+let soundOn = true, actx = null, master = null;
+function ensureAudio() {
+    try {
+        if (!actx) { actx = new (window.AudioContext || window.webkitAudioContext)(); master = actx.createGain(); master.gain.value = .9; master.connect(actx.destination); }
+        if (actx.state === "suspended") actx.resume();
+    } catch (e) {}
+}
+function tone(f, dur, o = {}) {
+    if (!soundOn || !actx) return;
+    const { type = "sine", vol = .3, delay = 0, slide = null } = o, t = actx.currentTime + delay;
+    const s = actx.createOscillator(), g = actx.createGain();
+    s.type = type; s.frequency.setValueAtTime(f, t); if (slide) s.frequency.exponentialRampToValueAtTime(slide, t + dur);
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .008); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    s.connect(g); g.connect(master); s.start(t); s.stop(t + dur + .03);
+}
+function noise(dur, o = {}) {
+    if (!soundOn || !actx) return;
+    const { vol = .3, delay = 0, from = 800, to = 3000, q = 1, type = "bandpass" } = o, t = actx.currentTime + delay;
+    const len = Math.floor(actx.sampleRate * dur), buf = actx.createBuffer(1, len, actx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const src = actx.createBufferSource(); src.buffer = buf;
+    const f = actx.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.setValueAtTime(from, t); f.frequency.exponentialRampToValueAtTime(to, t + dur);
+    const g = actx.createGain(); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .01); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(master); src.start(t); src.stop(t + dur + .03);
+}
+const SFX = {
+    click()  { tone(900, .06, { type: "square", vol: .12 }); },
+    flip()   { noise(.22, { from: 700, to: 4500, vol: .4 }); tone(480, .14, { type: "triangle", vol: .15, slide: 950, delay: .05 }); },
+    cardOn() { tone(660, .1, { type: "triangle", vol: .2, delay: .3 }); },
+    reveal() { tone(1047, .15, { type: "triangle", vol: .22 }); tone(1319, .15, { type: "triangle", vol: .22, delay: .1 }); tone(1568, .35, { type: "triangle", vol: .22, delay: .2 }); noise(.3, { from: 3000, to: 6000, vol: .1, delay: .05 }); },
+    meow()   { tone(620, .22, { type: "triangle", vol: .22, slide: 1000 }); tone(1000, .4, { type: "triangle", vol: .22, slide: 520, delay: .22 }); },
+    turn()   { [523, 659, 784].forEach((f, i) => tone(f, .16, { type: "triangle", vol: .18, delay: i * .1 })); },
+    collect(){ [784, 988, 1175].forEach((f, i) => tone(f, .2, { type: "triangle", vol: .2, delay: i * .08 })); noise(.25, { from: 4000, to: 7000, vol: .12, delay: .1 }); },
+    boom()   { noise(.9, { type: "lowpass", from: 900, to: 60, vol: .9 }); tone(110, .9, { vol: .6, slide: 30 }); tone(330, .5, { type: "sawtooth", vol: .15, slide: 80, delay: .05 }); },
+    jackpot(){
+        const m = [523, 659, 784, 1047, 784, 1047, 1319, 1568];
+        m.forEach((f, i) => { tone(f, i === 7 ? .8 : .16, { type: "square", vol: .12, delay: i * .1 }); tone(f / 2, .16, { type: "triangle", vol: .14, delay: i * .1 }); });
+        for (let i = 0; i < 10; i++) tone(2000 + Math.random() * 2000, .15, { vol: .06, delay: .9 + i * .07 });
+    },
+    whoosh() { noise(.7, { from: 400, to: 3000, vol: .3 }); tone(1568, .4, { vol: .2, delay: .9 }); tone(2093, .5, { vol: .15, delay: 1.0 }); },
+    diceTick() { noise(.04, { from: 2500, to: 2500, q: 4, vol: .25 }); tone(300 + Math.random() * 300, .03, { type: "square", vol: .06 }); },
+    good()   { [659, 880, 1175].forEach((f, i) => tone(f, .2, { type: "triangle", vol: .2, delay: i * .1 })); },
+    bad()    { tone(300, .25, { type: "sawtooth", vol: .15, slide: 200 }); tone(220, .4, { type: "sawtooth", vol: .15, slide: 120, delay: .25 }); },
+    win()    { const m = [523, 523, 523, 659, 784, 659, 784, 1047], tm = [0, .14, .28, .42, .62, .82, .96, 1.16]; m.forEach((f, i) => tone(f, i === 7 ? .9 : .2, { type: "square", vol: .13, delay: tm[i] })); }
+};
+
+/* ================= 語音 ================= */
+let zhVoice = null;
+function pickVoice() { try { const vs = speechSynthesis.getVoices(); zhVoice = vs.find(v => /zh[-_]TW/i.test(v.lang)) || vs.find(v => /^zh/i.test(v.lang)) || null; } catch (e) {} }
+if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+function speak(text, cancel = true) {
+    if (!soundOn || !("speechSynthesis" in window)) return;
+    try { if (cancel) speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(sayFix(text)); u.lang = "zh-TW"; if (zhVoice) u.voice = zhVoice; u.rate = 1; u.pitch = 1.1; speechSynthesis.speak(u); } catch (e) {}
+}
+// 語音唸法：電腦常把「骰」唸錯，改唸「貓咪方塊／數字方塊」
+function sayFix(t) { return String(t).replace(/貓色子|貓骰/g, "貓咪方塊").replace(/色子|骰子/g, "數字方塊").replace(/骰到/g, "丟到").replace(/擲/g, "丟"); }
+const CN = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
+function cn(n) { if (n <= 10) return CN[n]; if (n < 20) return "十" + CN[n - 10]; return cnNum(n); }
+function cnNum(n) {   // 0～999 的中文唸法
+    if (n < 0) return "負" + cnNum(-n);
+    if (n <= 10) return CN[n];
+    if (n < 20) return "十" + (n % 10 ? CN[n % 10] : "");
+    if (n < 100) return CN[Math.floor(n / 10)] + "十" + (n % 10 ? CN[n % 10] : "");
+    const h = Math.floor(n / 100), r = n % 100;
+    return CN[h] + "百" + (r === 0 ? "" : r < 10 ? "零" + CN[r] : r < 20 ? "一十" + (r % 10 ? CN[r % 10] : "") : cnNum(r));
+}
+// 說完才繼續（避免下一句把這句切掉）
+function speakAsync(text, cancel = true, minMs = 0) {
+    const t0 = performance.now();
+    return speakAsyncRaw(text, cancel).then(() => sleep(Math.max(0, minMs - (performance.now() - t0))));
+}
+function speakAsyncRaw(text, cancel = true) {
+    return new Promise(res => {
+        if (!soundOn || !("speechSynthesis" in window)) return res();
+        let done = false; const fin = () => { if (!done) { done = true; res(); } };
+        try {
+            if (cancel) speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(sayFix(text)); u.lang = "zh-TW"; if (zhVoice) u.voice = zhVoice; u.rate = 1; u.pitch = 1.1;
+            u.onend = fin; u.onerror = fin;
+            speechSynthesis.speak(u);
+        } catch (e) { fin(); }
+        setTimeout(fin, 1500 + text.length * 260);   // 保險：沒有語音時也會繼續
+    });
+}
+// 貓咪引導者：用不同的聲音（若電腦有第二種中文語音就換人，並把音調調高）
+function speakCat(text) {
+    return new Promise(res => {
+        if (!soundOn || !("speechSynthesis" in window)) return res();
+        let done = false; const fin = () => { if (!done) { done = true; res(); } };
+        try {
+            const vs = speechSynthesis.getVoices().filter(v => /^zh/i.test(v.lang));
+            const other = vs.find(v => v !== zhVoice && /zh[-_]TW/i.test(v.lang)) || vs.find(v => v !== zhVoice) || zhVoice;
+            const u = new SpeechSynthesisUtterance(sayFix(text)); u.lang = "zh-TW"; if (other) u.voice = other;
+            u.rate = 1.05; u.pitch = 1.8; u.onend = fin; u.onerror = fin;
+            speechSynthesis.speak(u);
+        } catch (e) { fin(); }
+        setTimeout(fin, 1500 + text.length * 260);
+    });
+}
+function toggleMute() { soundOn = !soundOn; $("mute-btn").textContent = soundOn ? "🔊" : "🔇"; if (!soundOn) try { speechSynthesis.cancel(); } catch (e) {} }
+
+/* ================= 設定玩家 ================= */
+function generateNameInputs() {
+    const count = parseInt($("player-count").value), c = $("name-inputs-container");
+    c.innerHTML = "";
+    for (let i = 1; i <= count; i++) c.innerHTML += `<input type="text" id="p-name-${i}" value="玩家 ${i}" maxlength="8">`;
+}
+generateNameInputs();
+
+function drawDice(face, angle, scale) {
+    ctx.setTransform(2, 0, 0, 2, 0, 0);
+    ctx.clearRect(0, 0, 100, 100);
+    ctx.save(); ctx.translate(50, 50); ctx.rotate(angle); ctx.scale(scale, scale);
+    ctx.fillStyle = "#fffdf0"; ctx.strokeStyle = "#8b5a2b"; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.roundRect(-38, -38, 76, 76, 14); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = face === "-2" ? "#d63031" : (face === "貓鍋特盛" ? "#e91e63" : "#0984e3");
+    ctx.font = face === "貓鍋特盛" ? "bold 13px sans-serif" : face === "🐱" ? "40px sans-serif" : "bold 30px sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(face, 0, 2);
+    ctx.restore();
+}
+drawDice("🐱", 0, 1);
+
+function startGame() {
+    ensureAudio(); SFX.click();
+    const count = parseInt($("player-count").value);
+    players = [];
+    for (let i = 1; i <= count; i++) {
+        players.push({
+            id: i - 1, name: $(`p-name-${i}`).value.trim() || `玩家 ${i}`, cards: [],
+            get grandMarkers() { return tokenObjects.filter(t => t.owner === this.id).length; },
+            get score() { return this.cards.reduce((s, v) => s + v, 0) + this.grandMarkers * 10; }
+        });
+    }
+    deck = [];
+    for (const num in CARD_DISTRIBUTION) for (let c = 0; c < CARD_DISTRIBUTION[num]; c++) deck.push(parseInt(num));
+    for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
+    discardPile = []; currentPot = []; currentPlayerIdx = 0;
+    $("setup-screen").style.display = "none";
+    $("game-screen").classList.add("on");
+    initRenderDOM();
+    renderEquation();
+    requestAnimationFrame(() => { createPhysicalTokens(); updateUI(); announceTurn(); });
+}
+
+function initRenderDOM() {
+    const zone = $("players-zone");
+    zone.innerHTML = "";
+    zone.classList.toggle("many", players.length >= 5);
+    document.body.classList.toggle("tok-small", players.length >= 5);
+    zone.onscroll = positionTokensNoAnimation;
+    players.forEach(p => {
+        zone.innerHTML += `<div class="player-card" id="player-card-${p.id}">
+            <div class="tag">▶</div>
+            <div class="pc-head"><div class="player-name">${p.name}</div>
+            <div class="player-score" id="score-val-${p.id}">💰 0 分</div></div>
+            <div class="player-details" id="details-${p.id}">卡片：0張 (0點)</div>
+            <div class="player-token-bay" id="token-bay-${p.id}"></div>
+            <div class="now">輪到你！</div>
+        </div>`;
+    });
+}
+
+/* ================= 特盛圓片 ================= */
+function createPhysicalTokens() {
+    tokenObjects.forEach(t => { if (t.element) t.element.remove(); t.owner = -1;
+        const el = document.createElement("div");
+        el.className = "grand-token";
+        el.innerHTML = `<span class="tk-top">10分</span><span class="tk-mid">特盛</span><span class="tk-btm">🐱鍋</span>`;
+        document.body.appendChild(el); t.element = el;
+    });
+    positionTokensNoAnimation();
+}
+function tokenTarget(t, owner) {
+    const box = owner === -1 ? $("public-token-pool") : $(`token-bay-${owner}`);
+    const r = box.getBoundingClientRect();
+    const before = tokenObjects.filter(x => x.owner === owner && x.id < t.id).length;
+    const small = owner !== -1 && document.body.classList.contains("tok-small");
+    return { left: r.left + before * (small ? 46 : 62) + (owner === -1 ? 0 : 6), top: r.top + 2 };
+}
+function positionTokensNoAnimation() {
+    tokenObjects.forEach(t => {
+        if (!t.element) return;
+        const p = tokenTarget(t, t.owner);
+        t.element.style.transition = "none";
+        t.element.style.left = p.left + "px"; t.element.style.top = p.top + "px";
+        t.element.offsetHeight;
+        t.element.style.transition = "";
+    });
+}
+function moveTokenWithAnimation(tokenId, newOwnerId, callback) {
+    const t = tokenObjects.find(x => x.id === tokenId);
+    t.owner = newOwnerId;
+    const p = tokenTarget(t, newOwnerId);
+    SFX.whoosh();
+    t.element.classList.add("flying");
+    t.element.style.left = p.left + "px"; t.element.style.top = p.top + "px";
+    setTimeout(() => t.element.classList.remove("flying"), 700);
+    setTimeout(() => { positionTokensNoAnimation(); bumpScore(newOwnerId); checkMascot(); if (callback) callback(); }, 1250);
+}
+function bumpScore(id) { const el = $(`score-val-${id}`); if (el) { el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); } }
+
+/* ================= 算式顯示（總和先藏起來，考心算） ================= */
+function potSum() { return currentPot.reduce((a, b) => a + b, 0); }
+function renderEquation(newIdx = -1) {
+    const eq = $("equation");
+    const n = currentPot.length;
+    const size = n <= 3 ? "clamp(90px,9vw,150px)" : n <= 5 ? "clamp(76px,7vw,120px)" : "clamp(60px,5.2vw,90px)";
+    eq.style.setProperty("--cs", size);
+    if (!n) { eq.innerHTML = `<div id="pot-hint">👈 點「抽牌堆」開始翻牌！</div>`; return; }
+    let h = "";
+    currentPot.forEach((num, i) => {
+        if (i > 0) h += `<span class="op">+</span>`;
+        h += `<div class="cat-card ${i === newIdx ? "" : "flipped"}" id="pc-${i}"><div class="inner">
+            <div class="face back">🐾</div>
+            <div class="face front cat-${num}"><span class="num">${num}</span></div></div></div>`;
+    });
+    h += `<span class="op eq">=</span><div class="q" id="eq-q">?</div>`;
+    eq.innerHTML = h;
+}
+let catTimer = null;
+function catSay(text, kind, voiceText) {
+    const b = $("cat-bubble");
+    b.textContent = "🐱 " + text;
+    b.className = kind;
+    void b.offsetWidth; b.classList.add("on");
+    setTimeout(() => SFX.meow(), 900);
+    speakCat(voiceText || text);
+    clearTimeout(catTimer);
+    catTimer = setTimeout(() => b.classList.remove("on"), 6000);
+}
+function hideCatBubble() { clearTimeout(catTimer); $("cat-bubble").classList.remove("on"); }
+function hideAnswer() {
+    hideCatBubble();
+    answerShown = false;
+    $("answer").classList.remove("show");
+    $("answer").innerHTML = "總和 = <b>?</b>";
+}
+function revealAnswer(auto = false) {
+    if (!currentPot.length) { if (!auto) { ensureAudio(); SFX.meow(); } return; }
+    ensureAudio();
+    const s = potSum();
+    answerShown = true;
+    $("answer").innerHTML = `總和 = <b>${s}</b>`;
+    $("answer").classList.remove("show"); void $("answer").offsetWidth; $("answer").classList.add("show");
+    const q = $("eq-q"); if (q) q.textContent = s;
+    if (!auto) {
+        SFX.meow(); SFX.reveal();
+        speak(currentPot.map(cn).join("加") + "，等於" + cn(s));
+        if (s >= 7 && s <= 9) catSay("喵～數字好接近 10，有點危險，要不要見好就收？", "warn", "喵～數字好接近十，有點危險，要不要見好就收？");
+        else if (s >= 1 && s <= 4) catSay("喵嗚～數字太小啦！別怕不會爆，繼續抽吧！", "go", "喵嗚～數字太小啦！別怕不會爆，繼續抽吧！");
+        const cb = $("cat-box"); cb.animate([{ transform: "scale(1)" }, { transform: "scale(1.15) rotate(-6deg)" }, { transform: "scale(1)" }], { duration: 400 });
+    }
+}
+
+/* ================= 介面更新 ================= */
+function updateUI() {
+    $("deck-count").textContent = deck.length;
+    $("discard-count").textContent = discardPile.length;
+    players.forEach((p, idx) => {
+        $(`player-card-${p.id}`).classList.toggle("active", idx === currentPlayerIdx);
+        const pts = p.cards.reduce((a, b) => a + b, 0);
+        $(`score-val-${p.id}`).textContent = `💰 ${p.score} 分`;
+        $(`details-${p.id}`).textContent = `卡片：${p.cards.length}張 (${pts}點)`;
+    });
+    $("btn-draw").disabled = isAnimating || deck.length === 0;
+    $("btn-collect").disabled = isAnimating || currentPot.length === 0;
+    $("btn-dice").disabled = isAnimating || currentPot.length === 0;
+    $("deck-pile").classList.toggle("active-deck", deck.length > 0);
+}
+
+async function showBanner(html, color = "#6cbe45", ms = 1600) {
+    const w = $("banner"), b = $("banner-box");
+    b.innerHTML = html; b.style.setProperty("--bc", color); w.style.setProperty("--bd", ms + "ms");
+    w.classList.remove("show"); void w.offsetWidth; w.classList.add("show");
+    await sleep(ms); w.classList.remove("show");
+}
+async function announceTurn() {
+    isAnimating = true; updateUI();
+    const p = players[currentPlayerIdx];
+    SFX.turn();
+    speak(`輪到${p.name}`);
+    await showBanner(`🐱 輪到 ${p.name}！`, "#6cbe45", 1500);
+    isAnimating = false; updateUI();
+}
+
+/* ================= 抽牌 ================= */
+async function playerDrawCard() {
+    if (isAnimating || deck.length === 0) return;
+    ensureAudio();
+    isAnimating = true;
+    hideAnswer();
+    const card = deck.pop();
+    currentPot.push(card);
+    updateUI();
+    renderEquation(currentPot.length - 1);
+    SFX.flip();
+    await sleep(60);
+    const el = $(`pc-${currentPot.length - 1}`);
+    if (el) el.classList.add("flipped");
+    SFX.cardOn();
+    speak(currentPot.map(cn).join("加"));
+    await sleep(650);
+    const s = potSum();
+    if (s === 10) {
+        revealAnswer(true);
+        await celebrate();
+        players[currentPlayerIdx].cards.push(...currentPot);
+        currentPot = []; hideAnswer(); renderEquation(); updateUI(); bumpScore(currentPlayerIdx);
+        await new Promise(res => handleGrandTokenFlow(res));
+        await sleep(300);
+        await announceScore(currentPlayerIdx);
+        return nextTurn();
+    }
+    if (s > 10) {
+        revealAnswer(true);
+        await bust(s);
+        discardPile.push(...currentPot);
+        currentPot = []; hideAnswer(); renderEquation(); updateUI();
+        return nextTurn();
+    }
+    isAnimating = false; updateUI();
+}
+
+async function playerCollectPot() {
+    if (isAnimating || currentPot.length === 0) return;
+    ensureAudio(); isAnimating = true; updateUI();
+    SFX.collect();
+    speak("見好就收！");
+    await flyPotTo(currentPlayerIdx);
+    players[currentPlayerIdx].cards.push(...currentPot);
+    currentPot = []; hideAnswer(); renderEquation(); updateUI(); bumpScore(currentPlayerIdx);
+    await announceScore(currentPlayerIdx, "見好就收！");
+    nextTurn();
+}
+function flyPotTo(idx) {
+    const dest = $(`player-card-${idx}`).getBoundingClientRect();
+    const jobs = [...document.querySelectorAll("#equation .cat-card")].map((c, i) => {
+        const r = c.getBoundingClientRect();
+        const dx = dest.left + dest.width / 2 - (r.left + r.width / 2), dy = dest.top + dest.height / 2 - (r.top + r.height / 2);
+        return c.animate([{ transform: "translate(0,0) scale(1)", opacity: 1 }, { transform: `translate(${dx}px,${dy}px) scale(.3)`, opacity: .2 }],
+            { duration: 700, delay: i * 90, easing: "ease-in", fill: "forwards" }).finished;
+    });
+    document.querySelectorAll("#equation .op, #equation .q").forEach(o => o.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: "forwards" }));
+    return Promise.all(jobs);
+}
+
+async function announceScore(idx, prefix = "") {
+    const p = players[idx];
+    await speakAsync(`${prefix}${p.name}目前共獲得${cnNum(p.score)}分`, false, 1800);
+}
+async function nextTurn() {
+    hideCatBubble();
+    isAnimating = false;
+    if (deck.length === 0 && currentPot.length === 0) return endGameOverall();
+    currentPlayerIdx = (currentPlayerIdx + 1) % players.length;
+    $("dice-result-text").textContent = "";
+    drawDice("🐱", 0, 1);
+    hideAnswer();
+    updateUI();
+    positionTokensNoAnimation();
+    await announceTurn();
+}
+
+/* ================= 特盛圓片流向（與三版相同） ================= */
+function handleGrandTokenFlow(callback) {
+    const free = tokenObjects.find(t => t.owner === -1);
+    if (free) { moveTokenWithAnimation(free.id, currentPlayerIdx, () => { updateUI(); callback(); }); return; }
+    const targets = players.filter(p => p.id !== currentPlayerIdx && p.grandMarkers > 0);
+    if (!targets.length) { callback(); return; }
+    speak("公區沒有圓片了，請選一位玩家搶走他的特盛圓片");
+    openSelectionModal("公區已空！請指定要搶哪位玩家的特盛大圓片（直接奪走10分）：", targets, targetId => {
+        const stolen = tokenObjects.find(t => t.owner === targetId);
+        moveTokenWithAnimation(stolen.id, currentPlayerIdx, () => { updateUI(); callback(); });
+    });
+}
+
+/* ================= 決勝點：擲貓骰（原版規則） =================
+   總和 ≥ 7 才能挑戰 → 鍋裡的牌全部捨棄 → 擲一次：
+   2 / 3：選一位玩家，從他的得分堆「隨機」抽 2 / 3 張變成自己的
+   -2   ：自己選得分堆裡任意 2 張丟掉
+   貓鍋 ：從公區拿 1 個特盛；公區沒了就搶別人的
+   做完換下一人 */
+const FACE_POS = ["front", "right", "top", "left", "bottom", "back"];        // DICE_FACES 第 i 面放在哪
+const FACE_SHOW = { front: [0, 0], right: [0, -90], top: [-90, 0], left: [0, 90], bottom: [90, 0], back: [0, 180] };
+const FACE_TF = { front: "translateZ(calc(var(--d) / 2))", back: "rotateY(180deg) translateZ(calc(var(--d) / 2))",
+    right: "rotateY(90deg) translateZ(calc(var(--d) / 2))", left: "rotateY(-90deg) translateZ(calc(var(--d) / 2))",
+    top: "rotateX(90deg) translateZ(calc(var(--d) / 2))", bottom: "rotateX(-90deg) translateZ(calc(var(--d) / 2))" };
+function faceHTML(f) {
+    if (f === "貓鍋特盛") return `<div class="disc pot"><span class="p">🍲</span>10分<br>特盛</div>`;
+    if (f === "-2") return `<div class="disc red">-2</div>`;
+    if (f === "2") return `<div class="disc blue">2</div>`;
+    return `<div class="disc green">3</div>`;
+}
+(function buildDice() {
+    $("dice3d").innerHTML = DICE_FACES.map((f, i) => `<div class="dface" style="transform:${FACE_TF[FACE_POS[i]]}">${faceHTML(f)}</div>`).join("");
+})();
+SFX.knock = (v = .5) => { tone(170, .12, { type: "triangle", vol: v * .8, slide: 90 }); noise(.07, { from: 1300, to: 900, q: 2, vol: v }); };
+
+async function roll3D(idx) {
+    const layer = $("dice3d-layer"); layer.classList.add("on");
+    const [fx, fy] = FACE_SHOW[FACE_POS[idx]];
+    const D = 2000;
+    $("dice-result-big").style.opacity = 0;
+    const pos = $("dice3d-pos").animate([
+        { transform: "translate(-38vw,-75vh)" },
+        { transform: "translate(-6vw,0)", offset: .42 },
+        { transform: "translate(-2vw,-20vh)", offset: .58 },
+        { transform: "translate(0,0)", offset: .74 },
+        { transform: "translate(0,-6vh)", offset: .85 },
+        { transform: "translate(0,0)", offset: .94 },
+        { transform: "translate(0,0)" }], { duration: D, fill: "forwards" });
+    $("dice3d-tilt").animate([
+        { transform: "rotateX(-20deg) rotateY(28deg)" },
+        { transform: "rotateX(-20deg) rotateY(28deg)", offset: .78 },
+        { transform: "rotateX(0deg) rotateY(0deg)" }], { duration: D + 350, easing: "ease-in-out", fill: "forwards" });
+    const cube = $("dice3d").animate([
+        { transform: "rotateX(0deg) rotateY(0deg)" },
+        { transform: `rotateX(${fx + 1080}deg) rotateY(${fy + 720}deg)` }], { duration: D, easing: "cubic-bezier(.15,.6,.25,1)", fill: "forwards" });
+    $("dice-shadow").animate([{ transform: "scale(.2)", opacity: .2 }, { transform: "scale(1)", opacity: 1, offset: .42 }, { transform: "scale(.6)", opacity: .5, offset: .58 },
+        { transform: "scale(1)", opacity: 1, offset: .74 }, { transform: "scale(1)", opacity: 1 }], { duration: D, fill: "forwards" });
+    [.42, .74, .94].forEach((t, k) => setTimeout(() => SFX.knock([.9, .6, .35][k]), D * t));
+    for (let k = 0; k < 9; k++) setTimeout(() => noise(.05, { from: 2200, to: 1800, q: 3, vol: .12 }), 120 + k * 90);
+    await sleep(D + 400);
+    $("dice3d").style.transform = `rotateX(${fx}deg) rotateY(${fy}deg)`;   // 停住、正面朝向大家
+    $("dice3d-tilt").style.transform = "rotateX(0deg) rotateY(0deg)";
+    cube.cancel(); $("dice3d-tilt").getAnimations().forEach(a => a.cancel());
+    return { pos, cube };
+}
+function hideDice(anims) {
+    $("dice3d-layer").animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400 }).onfinish = () => {
+        $("dice3d-layer").classList.remove("on"); anims.pos.cancel(); anims.cube.cancel();
+        $("dice3d-tilt").getAnimations().forEach(a => a.cancel());
+        document.querySelectorAll(".dface.win").forEach(f => f.classList.remove("win"));
+        $("dice-glow").classList.remove("on");
+        $("dice3d").style.transform = ""; $("dice3d-tilt").style.transform = "";
+        $("dice-rule").style.opacity = 0;
+    };
+}
+
+async function triggerDiceDuel() {
+    if (isAnimating || currentPot.length === 0) return;
+    ensureAudio();
+    if (potSum() < 7) {   // 不提前透露總和：按了才檢查
+        SFX.bad();
+        speak("還不到七點，不能擲貓色子喔");
+        $("dice-result-text").textContent = "還不到 7 點，不能擲骰！";
+        setTimeout(() => { if (!isAnimating) $("dice-result-text").textContent = ""; }, 1800);
+        return;
+    }
+    isAnimating = true; updateUI();
+    hideCatBubble();
+    revealAnswer(true);
+    speak("挑戰決勝點！鍋裡的牌全部丟掉，擲貓色子！");
+    await sleep(900);
+    discardPile.push(...currentPot);
+    currentPot = []; renderEquation(); updateUI();
+    const idx = Math.floor(Math.random() * 6);
+    const result = DICE_FACES[idx];
+    const anims = await roll3D(idx);                       // 1) 結果面轉正、面對大家、停住
+    await sleep(350);
+    document.querySelectorAll(".dface")[idx].classList.add("win");   // 2) 發亮
+    $("dice-glow").classList.add("on");
+    SFX.reveal(); tone(1568, .6, { vol: .2, delay: .25 }); tone(2093, .7, { vol: .15, delay: .35 });   // 3) 音效
+    const cur = players[currentPlayerIdx];
+    const freeTok = tokenObjects.some(t => t.owner === -1);
+    const label = result === "貓鍋特盛" ? "🍲 貓鍋特盛！" : result === "-2" ? "😱 -2" : `🥷 搶 ${result} 張！`;
+    const rule = result === "貓鍋特盛" ? (freeTok ? "骰子規定：拿 1 個特盛圓片（10分）！" : "骰子規定：公區沒了，搶別人 1 個特盛圓片！")
+        : result === "-2" ? `骰子規定：${cur.name} 要丟掉自己 2 張牌！`
+        : `骰子規定：${cur.name} 從一位玩家那邊隨機搶 ${result} 張牌！`;
+    const ruleVoice = result === "貓鍋特盛" ? (freeTok ? "貓鍋特盛！骰子規定：拿一個特盛圓片！" : "貓鍋特盛！骰子規定：公區沒有了，可以搶別人一個特盛圓片！")
+        : result === "-2" ? `負二！骰子規定：${cur.name}要丟掉自己兩張牌！`
+        : `${cn(+result)}！骰子規定：${cur.name}可以從一位玩家那邊，隨機搶${cn(+result)}張牌！`;
+    await sleep(700);
+    const big = $("dice-result-big"); big.textContent = label;     // 4) 播報結果與要做什麼
+    big.animate([{ opacity: 0, transform: "translateX(-50%) scale(.4)" }, { opacity: 1, transform: "translateX(-50%) scale(1.15)" }, { opacity: 1, transform: "translateX(-50%) scale(1)" }], { duration: 500, fill: "forwards" });
+    const rb = $("dice-rule"); rb.textContent = rule;
+    rb.animate([{ opacity: 0, transform: "translateX(-50%) translateY(20px)" }, { opacity: 1, transform: "translateX(-50%) translateY(0)" }], { duration: 450, delay: 250, fill: "forwards" });
+    drawDice(result, 0, 1.1);
+    $("dice-result-text").textContent = `骰出：【${result}】`;
+    hideAnswer();
+    await speakAsync(ruleVoice, true, 2200);
+    await sleep(500);
+    hideDice(anims);
+    await sleep(300);
+    resolveDiceResult(result);
+}
+
+async function resolveDiceResult(result) {
+    const cur = players[currentPlayerIdx];
+    if (result === "貓鍋特盛") {
+        SFX.jackpot(); [0, 600].forEach(d => setTimeout(() => SFX.meow(), d));
+        await showBanner("🍲 貓鍋特盛！", "#e91e63", 1200);
+        await new Promise(res => handleGrandTokenFlow(res));
+        await announceScore(currentPlayerIdx);
+        return nextTurn();
+    }
+    if (result === "2" || result === "3") {
+        const n = parseInt(result);
+        const targets = players.filter(p => p.id !== currentPlayerIdx && p.cards.length > 0);
+        if (!targets.length) {
+            SFX.bad();
+            await showBanner("🐾 大家都沒有得分卡，搶不到！", "#888", 1600);
+            await speakAsync("大家都還沒有得分卡，搶不到");
+            return nextTurn();
+        }
+        SFX.good(); speak(`請選一位玩家`);
+        openSelectionModal(`🎲 擲出 ${n}！請選一位玩家，從他的得分堆「隨機」搶 ${n} 張貓卡：`, targets, async id => {
+            const v = players.find(p => p.id === id), real = Math.min(n, v.cards.length);
+            const taken = [];
+            for (let k = 0; k < real; k++) taken.push(v.cards.splice(Math.floor(Math.random() * v.cards.length), 1)[0]);
+            updateUI();
+            await showSteal(v, cur, taken);
+            nextTurn();
+        });
+        return;
+    }
+    // -2：自己選 2 張丟掉
+    if (!cur.cards.length) {
+        SFX.bad();
+        await showBanner("😅 骰到 -2，但你還沒有牌可以扣！", "#888", 1700);
+        await speakAsync("骰到負二，可是還沒有牌可以扣，好險");
+        return nextTurn();
+    }
+    SFX.bad();
+    let dropIdx;
+    if (cur.cards.length <= 2) {
+        dropIdx = cur.cards.map((_, k) => k);
+        await showBanner(`😭 骰到 -2！只有 ${cur.cards.length} 張，全部丟掉`, "#d63031", 1800);
+    } else {
+        speak(`骰到負二，${cur.name}請選兩張要丟掉的牌`);
+        dropIdx = await pickCardsToDrop(cur, 2);
+    }
+    const dropped = dropIdx.map(k => cur.cards[k]);
+    cur.cards = cur.cards.filter((_, k) => !dropIdx.includes(k));
+    discardPile.push(...dropped);
+    updateUI();
+    await showBanner(`🗑️ 丟掉了 ${dropped.join(" 分、")} 分的牌`, "#d63031", 1600);
+    await speakAsync(`丟掉了${dropped.map(x => cn(x) + "分").join("和")}的牌，${cur.name}目前共獲得${cnNum(cur.score)}分`);
+    nextTurn();
+}
+
+function pickCardsToDrop(p, need) {
+    return new Promise(res => {
+        $("pick-title").textContent = `😭 骰到 -2！${p.name} 請點選 ${need} 張要丟掉的牌`;
+        const box = $("pick-cards"), ok = $("pick-ok");
+        const sel = new Set();
+        box.innerHTML = p.cards.map((c, k) => `<div class="cat-card flipped" data-k="${k}"><div class="inner">
+            <div class="face back">🐾</div><div class="face front cat-${c}"><span class="num">${c}</span></div></div></div>`).join("");
+        ok.disabled = true;
+        box.querySelectorAll(".cat-card").forEach(el => el.onclick = () => {
+            const k = +el.dataset.k;
+            if (sel.has(k)) sel.delete(k); else if (sel.size < need) sel.add(k);
+            el.classList.toggle("sel", sel.has(k)); SFX.click();
+            ok.disabled = sel.size !== need;
+        });
+        ok.onclick = () => { $("pick-modal").style.display = "none"; res([...sel]); };
+        $("pick-modal").style.display = "flex";
+    });
+}
+
+// 搶牌：一張一張飛出來翻開給大家看，再播報
+async function showSteal(victim, thief, taken) {
+    const ov = $("steal-overlay"), row = $("steal-cards");
+    $("steal-title").textContent = `🎲 骰子規定：${thief.name} 從 ${victim.name} 那邊搶 ${taken.length} 張牌！`;
+    $("steal-total").textContent = "";
+    row.innerHTML = "";
+    ov.classList.add("on");
+    await speakAsync(`骰子規定：${thief.name}從${victim.name}那邊搶${cn(taken.length)}張牌！`, true, 2200);
+    const from = $(`player-card-${victim.id}`).getBoundingClientRect();
+    for (const c of taken) {
+        const el = document.createElement("div");
+        el.className = "cat-card";
+        el.innerHTML = `<div class="inner"><div class="face back">🐾</div><div class="face front cat-${c}"><span class="num">${c}</span></div></div>`;
+        row.appendChild(el);
+        const r = el.getBoundingClientRect();
+        SFX.whoosh();
+        await el.animate([{ transform: `translate(${from.left + from.width / 2 - r.left - r.width / 2}px,${from.top + from.height / 2 - r.top - r.height / 2}px) scale(.3)` },
+            { transform: "translate(0,0) scale(1)" }], { duration: 750, easing: "cubic-bezier(.2,.8,.3,1.2)" }).finished;
+        await sleep(250);
+        SFX.flip(); el.classList.add("flipped");
+        await sleep(450);
+        SFX.cardOn();
+        await speakAsync(`${cn(c)}分！`, true, 1300);
+        await sleep(300);
+    }
+    const sum = taken.reduce((a, b) => a + b, 0);
+    thief.cards.push(...taken);
+    updateUI(); bumpScore(thief.id);
+    $("steal-total").textContent = `共搶到 ${sum} 點！${thief.name} 目前共 ${thief.score} 分 🎉`;
+    SFX.collect();
+    await speakAsync(`從${victim.name}那邊搶走${cn(taken.length)}張卡，` + taken.map(c => `一張是${cn(c)}分的卡`).join("，") +
+        `，恭喜恭喜～目前${thief.name}總共獲得${cnNum(thief.score)}分！`, true, 3500);
+    // 卡片飛進搶的人
+    const to = $(`player-card-${thief.id}`).getBoundingClientRect();
+    await Promise.all([...row.children].map((el, k) => {
+        const r = el.getBoundingClientRect();
+        return el.animate([{ transform: "translate(0,0) scale(1)", opacity: 1 },
+            { transform: `translate(${to.left + to.width / 2 - r.left - r.width / 2}px,${to.top + to.height / 2 - r.top - r.height / 2}px) scale(.25)`, opacity: .3 }],
+            { duration: 700, delay: k * 120, easing: "ease-in", fill: "forwards" }).finished;
+    }));
+    ov.classList.remove("on");
+}
+
+function openSelectionModal(title, list, onSelect) {
+    $("modal-title").textContent = title;
+    const box = $("modal-options"); box.innerHTML = "";
+    list.forEach(p => {
+        const b = document.createElement("button");
+        b.className = "target-btn";
+        const pts = p.cards.reduce((a, c) => a + c, 0);
+        b.textContent = `${p.name}（總分 ${p.score}｜卡片 ${pts} 點｜特盛 ${p.grandMarkers} 片）`;
+        b.onclick = () => { SFX.click(); $("interaction-modal").style.display = "none"; onSelect(p.id); };
+        box.appendChild(b);
+    });
+    $("interaction-modal").style.display = "flex";
+}
+
+/* ================= 特效 ================= */
+async function celebrate() {
+    SFX.jackpot();
+    [0, 500, 1100, 1700].forEach(d => setTimeout(() => SFX.meow(), d));
+    speak("湊到十點！貓鍋特盛！");
+    const fx = $("fx-container");
+    const cat = document.createElement("div");
+    cat.textContent = "🐱"; cat.style.cssText = "position:absolute;left:50%;top:50%;font-size:140px;";
+    fx.appendChild(cat);
+    cat.animate([{ transform: "translate(-50%,60vh) scale(.5) rotate(0)" }, { transform: "translate(-50%,-60%) scale(1.6) rotate(15deg)", offset: .4 },
+        { transform: "translate(-50%,-55%) scale(1.5) rotate(-10deg)", offset: .7 }, { transform: "translate(-50%,60vh) scale(.8) rotate(-20deg)" }], { duration: 1900, easing: "ease-out" }).onfinish = () => cat.remove();
+    for (let i = 0; i < 60; i++) {
+        const p = document.createElement("div");
+        p.textContent = ["✨", "🎉", "🐟", "🍲", "🐾", "⭐"][i % 6];
+        p.style.cssText = `position:absolute;left:50%;top:42%;font-size:${22 + Math.random() * 22}px;`;
+        fx.appendChild(p);
+        const a = Math.random() * Math.PI * 2, d = 200 + Math.random() * 450;
+        p.animate([{ transform: "translate(-50%,-50%) scale(.3)", opacity: 1 },
+            { transform: `translate(calc(-50% + ${Math.cos(a) * d}px), calc(-50% + ${Math.sin(a) * d + 150}px)) rotate(${Math.random() * 720}deg) scale(1)`, opacity: 0 }],
+            { duration: 1400 + Math.random() * 800, easing: "cubic-bezier(.2,.8,.4,1)" }).onfinish = () => p.remove();
+    }
+    await showBanner("🍲 湊到 10！貓鍋特盛！<small>拿走一片特盛圓片（10分）</small>", "#ff9f43", 2000);
+}
+async function bust(s) {
+    SFX.boom();
+    speak(`${cn(s)}點，爆鍋了！`);
+    $("pot-zone").classList.remove("boom"); void $("pot-zone").offsetWidth; $("pot-zone").classList.add("boom");
+    const fx = $("fx-container"), r = $("equation").getBoundingClientRect();
+    for (let i = 0; i < 26; i++) {
+        const p = document.createElement("div");
+        p.textContent = ["💥", "🔥", "💨"][i % 3];
+        p.style.cssText = `position:absolute;left:${r.left + r.width / 2}px;top:${r.top + r.height / 2}px;font-size:${30 + Math.random() * 30}px;`;
+        fx.appendChild(p);
+        const a = Math.random() * Math.PI * 2, d = 120 + Math.random() * 260;
+        p.animate([{ transform: "translate(-50%,-50%) scale(.3)", opacity: 1 }, { transform: `translate(calc(-50% + ${Math.cos(a) * d}px), calc(-50% + ${Math.sin(a) * d}px)) scale(1.4)`, opacity: 0 }],
+            { duration: 900 + Math.random() * 500, easing: "ease-out" }).onfinish = () => p.remove();
+    }
+    await showBanner(`💥 爆鍋啦！總和 ${s} 超過 10<small>這回合的牌全部丟掉</small>`, "#d63031", 2200);
+}
+
+/* ================= 結算 ================= */
+function endGameOverall() {
+    const sorted = players.slice().sort((a, b) => b.score - a.score);
+    let rank = 0, prev = null;
+    sorted.forEach((p, i) => { if (p.score !== prev) { rank = i + 1; prev = p.score; } p.rank = rank; });
+    const medal = r => r === 1 ? "🥇" : r === 2 ? "🥈" : r === 3 ? "🥉" : "　";
+    $("end-list").innerHTML = sorted.map(p => `${medal(p.rank)} 第 ${p.rank} 名　${p.name}：${p.score} 分（特盛 ${p.grandMarkers} 片）`).join("<br>");
+    $("end-modal").style.display = "flex";
+    SFX.win();
+    speak(`遊戲結束！恭喜${sorted.filter(p => p.rank === 1).map(p => p.name).join("和")}得到第一名！`);
+}
+window.addEventListener("resize", positionTokensNoAnimation);
+
+/* =====================================================================
+   🐱 小貓吉祥物：三個特盛圓片都被玩家拿走後出現
+   行為：1 趴在框上睡覺打呼 2 沿邊框走、回頭看大家喵 3 躲在玩家欄後面舔手
+         4 倒吊在上邊框下走路 5 被右上角貓咪卡嚇到 6 坐在答案上不給看（要拖走）
+         7 去舔玩家的特盛圓片    ＊隨時可以用滑鼠拎起來（倒V型，生氣喵喵叫）
+   ===================================================================== */
+const MC = { el: null, run: 0, x: -300, y: 0, W: 150, H: 120, active: false, blocking: false, dragging: false, last: "" };
+function headF() {
+    const F = "#f7a54a", S = "#d9782a", C = "#fff4e2", P = "#ffb6c6", D = "#3a2615", N = "#ff7f9e";
+    return `
+    <path d="M-40,-12 L-35,-52 L-11,-30 Z" fill="${F}" stroke="${S}" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M-34,-20 L-32,-42 L-17,-30 Z" fill="${P}"/>
+    <path d="M40,-12 L35,-52 L11,-30 Z" fill="${F}" stroke="${S}" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M34,-20 L32,-42 L17,-30 Z" fill="${P}"/>
+    <ellipse cx="0" cy="0" rx="45" ry="37" fill="${F}" stroke="${S}" stroke-width="2.5"/>
+    <path d="M-9,-36 L-7,-24 M0,-37 L0,-24 M9,-36 L7,-24" stroke="${S}" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M-45,6 L-53,11 L-44,14 M45,6 L53,11 L44,14" fill="${F}" stroke="${S}" stroke-width="2" stroke-linejoin="round"/>
+    <ellipse cx="0" cy="14" rx="21" ry="14" fill="${C}"/>
+    <ellipse cx="-27" cy="11" rx="7.5" ry="4.5" fill="${P}" opacity=".75"/><ellipse cx="27" cy="11" rx="7.5" ry="4.5" fill="${P}" opacity=".75"/>
+    <g class="eN"><ellipse cx="-16" cy="-4" rx="8" ry="10" fill="${D}"/><circle cx="-13" cy="-8.5" r="3.2" fill="#fff"/><circle cx="-18.5" cy="0" r="1.5" fill="#fff"/>
+        <ellipse cx="16" cy="-4" rx="8" ry="10" fill="${D}"/><circle cx="19" cy="-8.5" r="3.2" fill="#fff"/><circle cx="13.5" cy="0" r="1.5" fill="#fff"/></g>
+    <g class="eC" stroke="${D}" stroke-width="3.2" fill="none" stroke-linecap="round"><path d="M-25,-3 Q-16,5 -7,-3"/><path d="M7,-3 Q16,5 25,-3"/></g>
+    <g class="eH" stroke="${D}" stroke-width="3.2" fill="none" stroke-linecap="round"><path d="M-25,0 Q-16,-10 -7,0"/><path d="M7,0 Q16,-10 25,0"/></g>
+    <g class="eS"><circle cx="-16" cy="-5" r="12" fill="#fff" stroke="${D}" stroke-width="2.5"/><circle cx="-16" cy="-5" r="3.5" fill="${D}"/>
+        <circle cx="16" cy="-5" r="12" fill="#fff" stroke="${D}" stroke-width="2.5"/><circle cx="16" cy="-5" r="3.5" fill="${D}"/>
+        <path d="M-28,-22 Q-17,-28 -6,-22 M6,-22 Q17,-28 28,-22" stroke="${D}" stroke-width="2.5" fill="none"/></g>
+    <g class="eA"><path d="M-27,-13 L-7,-5 M27,-13 L7,-5" stroke="${D}" stroke-width="3.5" stroke-linecap="round"/>
+        <path d="M-24,-4 Q-16,-1 -8,-3 Q-12,6 -18,5 Q-24,3 -24,-4 Z" fill="${D}"/><path d="M24,-4 Q16,-1 8,-3 Q12,6 18,5 Q24,3 24,-4 Z" fill="${D}"/></g>
+    <path d="M-4.5,6 L4.5,6 L0,10.5 Z" fill="${N}"/>
+    <g class="mN"><path d="M0,10.5 Q-4,17 -9,13.5 M0,10.5 Q4,17 9,13.5" stroke="${D}" stroke-width="2" fill="none" stroke-linecap="round"/></g>
+    <g class="mO"><path d="M-8,13 Q0,30 8,13 Q0,16 -8,13 Z" fill="#b33a4a" stroke="${D}" stroke-width="1.6"/><ellipse cx="0" cy="22" rx="4" ry="3" fill="#ff7f9e"/></g>
+    <g class="mT"><ellipse class="tongue" cx="0" cy="18" rx="4.5" ry="6" fill="#ff6f8f" stroke="#c94a6a" stroke-width="1"/></g>
+    <path d="M-20,12 L-42,7 M-20,16 L-42,18 M20,12 L42,7 M20,16 L42,18" stroke="#b07a4a" stroke-width="1.3" stroke-linecap="round"/>`;
+}
+function headS() {
+    const F = "#f7a54a", S = "#d9782a", C = "#fff4e2", P = "#ffb6c6", D = "#3a2615", N = "#ff7f9e";
+    return `
+    <path d="M2,-28 L12,-52 L22,-22 Z" fill="${F}" stroke="${S}" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M-20,-20 L-15,-50 L3,-28 Z" fill="${F}" stroke="${S}" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M-14,-26 L-12,-42 L-2,-29 Z" fill="${P}"/>
+    <ellipse cx="0" cy="0" rx="31" ry="28" fill="${F}" stroke="${S}" stroke-width="2.5"/>
+    <path d="M-12,-25 L-9,-15 M-3,-27 L-2,-16" stroke="${S}" stroke-width="3" stroke-linecap="round"/>
+    <ellipse cx="21" cy="9" rx="13" ry="10" fill="${C}"/>
+    <ellipse cx="7" cy="11" rx="6.5" ry="3.8" fill="${P}" opacity=".75"/>
+    <g class="eN"><ellipse cx="11" cy="-4" rx="5.5" ry="7.5" fill="${D}"/><circle cx="13" cy="-7.5" r="2.2" fill="#fff"/></g>
+    <g class="eC eH eS eA"><path d="M5,-3 Q11,3 17,-3" stroke="${D}" stroke-width="3" fill="none" stroke-linecap="round"/></g>
+    <ellipse cx="32" cy="5" rx="3.5" ry="2.8" fill="${N}"/>
+    <g class="mN"><path d="M31,9 Q28,14 23,12" stroke="${D}" stroke-width="2" fill="none" stroke-linecap="round"/></g>
+    <g class="mO"><path d="M22,11 Q29,22 33,10 Z" fill="#b33a4a" stroke="${D}" stroke-width="1.5"/></g>
+    <path d="M24,9 L46,4 M24,12 L46,14" stroke="#b07a4a" stroke-width="1.3" stroke-linecap="round"/>`;
+}
+function catSVG() {
+    const F = "#f7a54a", S = "#d9782a", C = "#fff4e2";
+    const tail = (cls, d) => `<g class="${cls}"><path d="${d}" stroke="${S}" stroke-width="17" fill="none" stroke-linecap="round"/><path d="${d}" stroke="${F}" stroke-width="12" fill="none" stroke-linecap="round"/></g>`;
+    const leg = (cls, x, far) => `<g class="leg ${cls}"><rect x="${x}" y="102" width="15" height="44" rx="7.5" fill="${far ? S : F}" stroke="${S}" stroke-width="2"/><ellipse cx="${x + 8}" cy="148" rx="10" ry="5.5" fill="${far ? S : C}" stroke="${S}" stroke-width="2"/></g>`;
+    return `<svg viewBox="0 0 200 160">
+    <g class="pose pw">
+        ${tail("tailW", "M52,98 C28,92 20,62 36,44")}
+        ${leg("legA", 58, 1)}${leg("legB", 124, 1)}
+        <g class="pwBody">
+            <ellipse cx="97" cy="100" rx="53" ry="27" fill="${F}" stroke="${S}" stroke-width="2.5"/>
+            <ellipse cx="100" cy="112" rx="34" ry="12" fill="${C}"/>
+            <path d="M74,76 Q78,88 74,96 M92,74 Q96,86 92,94 M110,75 Q114,86 110,94" stroke="${S}" stroke-width="4" fill="none" stroke-linecap="round"/>
+        </g>
+        ${leg("legB", 66, 0)}${leg("legA", 134, 0)}
+        <g class="hs" transform="translate(152,70)">${headS()}</g>
+        <g class="hf" transform="translate(150,64) scale(.82)">${headF()}</g>
+    </g>
+    <g class="pose ps">
+        <path class="spikes" d="M60,120 L50,104 L66,108 L62,88 L78,98 L84,80 L94,94 L104,78 L110,94 L122,80 L124,98 L140,90 L134,108 L152,106 L140,122 L154,136 L136,134 Z" fill="${F}" stroke="${S}" stroke-width="2.5" stroke-linejoin="round"/>
+        ${tail("tailS", "M128,142 C172,146 184,104 160,82")}
+        <ellipse cx="100" cy="122" rx="41" ry="34" fill="${F}" stroke="${S}" stroke-width="2.5"/>
+        <ellipse cx="100" cy="128" rx="23" ry="25" fill="${C}"/>
+        <ellipse cx="68" cy="150" rx="17" ry="8" fill="${F}" stroke="${S}" stroke-width="2"/><ellipse cx="132" cy="150" rx="17" ry="8" fill="${F}" stroke="${S}" stroke-width="2"/>
+        <rect x="82" y="116" width="15" height="36" rx="7.5" fill="${F}" stroke="${S}" stroke-width="2"/><ellipse cx="89.5" cy="151" rx="10" ry="5.5" fill="${C}" stroke="${S}" stroke-width="2"/>
+        <g class="pawR"><rect x="103" y="116" width="15" height="36" rx="7.5" fill="${F}" stroke="${S}" stroke-width="2"/><ellipse cx="110.5" cy="151" rx="10" ry="5.5" fill="${C}" stroke="${S}" stroke-width="2"/></g>
+        <g class="hfs" transform="translate(100,62)">${headF()}</g>
+        <g class="pawUp"><path d="M112,128 C118,112 122,100 116,90" stroke="${S}" stroke-width="17" fill="none" stroke-linecap="round"/>
+            <path d="M112,128 C118,112 122,100 116,90" stroke="${F}" stroke-width="12" fill="none" stroke-linecap="round"/>
+            <ellipse cx="115" cy="86" rx="10" ry="9" fill="${C}" stroke="${S}" stroke-width="2"/>
+            <circle cx="111" cy="81" r="2" fill="#ffb6c6"/><circle cx="116" cy="79" r="2" fill="#ffb6c6"/><circle cx="121" cy="82" r="2" fill="#ffb6c6"/></g>
+    </g>
+    <g class="pose pz"><g class="sleepBody">
+        ${tail("", "M156,130 C182,154 112,164 58,152")}
+        <ellipse cx="112" cy="124" rx="58" ry="31" fill="${F}" stroke="${S}" stroke-width="2.5"/>
+        <path d="M102,95 Q106,107 102,117 M122,95 Q126,107 122,117 M142,99 Q145,109 141,119" stroke="${S}" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <g transform="translate(66,118) rotate(-14) scale(.74)">${headF()}</g>
+        <ellipse cx="80" cy="147" rx="13" ry="6.5" fill="${C}" stroke="${S}" stroke-width="2"/><ellipse cx="99" cy="149" rx="13" ry="6.5" fill="${C}" stroke="${S}" stroke-width="2"/>
+    </g></g>
+    <g class="pose ph">
+        ${tail("", "M100,96 C106,128 94,146 102,160")}
+        <path d="M100,64 L58,138" stroke="${S}" stroke-width="34" stroke-linecap="round"/><path d="M100,64 L142,138" stroke="${S}" stroke-width="34" stroke-linecap="round"/>
+        <path d="M100,64 L58,138" stroke="${F}" stroke-width="29" stroke-linecap="round"/><path d="M100,64 L142,138" stroke="${F}" stroke-width="29" stroke-linecap="round"/>
+        <path d="M80,92 L72,112 M120,92 L128,112" stroke="${S}" stroke-width="4" stroke-linecap="round"/>
+        <ellipse cx="55" cy="146" rx="11" ry="8" fill="${C}" stroke="${S}" stroke-width="2"/><ellipse cx="145" cy="146" rx="11" ry="8" fill="${C}" stroke="${S}" stroke-width="2"/>
+        <ellipse cx="100" cy="80" rx="24" ry="22" fill="${F}" stroke="${S}" stroke-width="2.5"/>
+        <ellipse cx="86" cy="98" rx="7" ry="10" fill="${C}" stroke="${S}" stroke-width="2"/><ellipse cx="114" cy="98" rx="7" ry="10" fill="${C}" stroke="${S}" stroke-width="2"/>
+        <g transform="translate(100,40) scale(.86)">${headF()}</g>
+    </g></svg>`;
+}
+
+/* ---- 小貓的聲音 ---- */
+const CAT = {
+    meow()  { tone(700, .18, { type: "triangle", vol: .22, slide: 1150 }); tone(1150, .45, { type: "triangle", vol: .22, slide: 600, delay: .17 }); tone(700, .6, { type: "sawtooth", vol: .03, slide: 600 }); },
+    mew()   { tone(1050, .12, { type: "triangle", vol: .2, slide: 1500 }); tone(1500, .26, { type: "triangle", vol: .2, slide: 1100, delay: .11 }); },
+    angry() { tone(520, .25, { type: "sawtooth", vol: .12, slide: 950 }); tone(950, .5, { type: "sawtooth", vol: .12, slide: 380, delay: .22 }); noise(.3, { from: 2600, to: 1500, vol: .1, delay: .2 }); },
+    hiss()  { noise(.9, { type: "highpass", from: 3600, to: 2600, vol: .35 }); tone(1250, .55, { type: "triangle", vol: .22, slide: 1900, delay: .5 }); },
+    purr()  { tone(27, 1.9, { type: "sawtooth", vol: .16 }); noise(1.9, { type: "lowpass", from: 320, to: 200, vol: .08 }); },
+    lick()  { noise(.09, { from: 1700, to: 2700, q: 4, vol: .22 }); },
+    jump()  { tone(480, .16, { vol: .12, slide: 950 }); },
+    yawn()  { tone(650, .9, { type: "triangle", vol: .15, slide: 330 }); },
+    huff()  { noise(.25, { type: "lowpass", from: 700, to: 300, vol: .2 }); }
+};
+
+function mcCls(add, remove) { remove.forEach(c => MC.el.classList.remove(c)); add.forEach(c => c && MC.el.classList.add(c)); }
+function mcPose(p) { mcCls(["p-" + p], ["p-walk", "p-sit", "p-sleep", "p-hang"]); }
+function mcFace(f = "") { mcCls(f.split(" "), ["e-closed", "e-happy", "e-scared", "e-angry", "m-open", "m-tongue"]); }
+function mcPlace(x, y) { MC.x = x; MC.y = y; MC.el.style.left = x + "px"; MC.el.style.top = y + "px"; if (MC.el.querySelector(".mc-bubble.on")) mcBubblePlace(); }
+function mcDir(d) { MC.el.style.setProperty("--sx", d < 0 ? -1 : 1); }
+function mcFlipY(v) { MC.el.style.setProperty("--sy", v ? -1 : 1); }
+function mcK(k) { MC.el.style.setProperty("--k", k); }
+const alive = run => run === MC.run && MC.active && !MC.dragging;
+let sayTimer = null;
+function mcBubblePlace() {
+    const b = MC.el.querySelector(".mc-bubble"), r = MC.el.getBoundingClientRect();
+    b.classList.remove("up", "side-r", "side-l");
+    const bh = b.offsetHeight || 40, bw = b.offsetWidth || 200;
+    let cls = "up";
+    if (r.top - bh - 16 < 4) cls = (r.left + r.width / 2 < window.innerWidth / 2) ? "side-r" : "side-l";   // 上方放不下 → 放旁邊
+    else if (r.left + r.width / 2 - bw / 2 < 4) cls = "side-r";                                             // 太靠左邊
+    else if (r.left + r.width / 2 + bw / 2 > window.innerWidth - 4) cls = "side-l";                         // 太靠右邊
+    b.classList.add(cls);
+}
+function mcSay(t, ms = 1600) {
+    const b = MC.el.querySelector(".mc-bubble");
+    b.textContent = t; mcBubblePlace(); b.classList.add("on");
+    clearTimeout(sayTimer); sayTimer = setTimeout(() => b.classList.remove("on"), ms);
+}
+function mcZ() {
+    const z = document.createElement("div"); z.className = "mc-z"; z.textContent = "z";
+    z.style.left = (MC.x + MC.W * .3) + "px"; z.style.top = (MC.y + MC.H * .4) + "px"; z.style.fontSize = (MC.W * .18) + "px";
+    document.body.appendChild(z);
+    z.animate([{ transform: "translate(0,0)", opacity: 0 }, { opacity: 1, offset: .2 }, { transform: `translate(-${MC.W * .3}px,-${MC.H * .7}px) scale(1.8)`, opacity: 0 }], { duration: 2200 }).onfinish = () => z.remove();
+}
+const tableRect = () => document.querySelector(".game-table").getBoundingClientRect();
+function topEdge() { const r = tableRect(); return { y: r.top - MC.H * .95 + 7, x0: r.left + 6, x1: r.right - MC.W - 6 }; }
+function underTop() { const r = tableRect(); return { y: r.top + 6 - MC.H * .85, x0: r.left + 14, x1: r.right - MC.W - 14 }; }
+
+function mcWalkTo(x, y, speed, run) {
+    return new Promise(res => {
+        mcPose("walk"); MC.el.classList.add("walking"); MC.el.classList.remove("look");
+        if (Math.abs(x - MC.x) > 2) mcDir(x - MC.x);
+        let last = performance.now();
+        (function step(t) {
+            if (!alive(run)) { MC.el.classList.remove("walking"); return res(false); }
+            const dt = (t - last) / 1000; last = t;
+            const dx = x - MC.x, dy = y - MC.y, d = Math.hypot(dx, dy), m = speed * dt;
+            if (d <= m) { mcPlace(x, y); MC.el.classList.remove("walking"); return res(true); }
+            mcPlace(MC.x + dx / d * m, MC.y + dy / d * m);
+            requestAnimationFrame(step);
+        })(last);
+    });
+}
+function mcJumpTo(x, y, run, dur = 650) {
+    return new Promise(res => {
+        if (!alive(run)) return res(false);
+        CAT.jump();
+        mcPose("walk"); MC.el.classList.remove("walking", "look");
+        if (Math.abs(x - MC.x) > 2) mcDir(x - MC.x);
+        const sx = MC.x, sy = MC.y, t0 = performance.now(), hgt = Math.max(70, Math.abs(y - sy) * .5);
+        (function step(t) {
+            if (!alive(run)) return res(false);
+            const k = Math.min(1, (t - t0) / dur);
+            mcPlace(sx + (x - sx) * k, sy + (y - sy) * k - Math.sin(Math.PI * k) * hgt);
+            if (k < 1) requestAnimationFrame(step); else res(true);
+        })(t0);
+    });
+}
+async function ensureTop(run) {
+    const e = topEdge();
+    mcFlipY(false); mcK(1); MC.el.classList.remove("hiding", "lickpaw");
+    if (Math.abs(MC.y - e.y) > 6 || MC.x < e.x0 - 5 || MC.x > e.x1 + 5) return mcJumpTo(Math.min(e.x1, Math.max(e.x0, MC.x)), e.y, run);
+    return true;
+}
+async function wait(ms, run) { const end = performance.now() + ms; while (performance.now() < end) { if (!alive(run)) return false; await sleep(100); } return true; }
+async function blink(run) { mcFace("e-closed"); await sleep(160); if (alive(run)) mcFace(""); }
+
+/* ---- 七種行為 ---- */
+async function bSleep(run) {        // 1 趴在框上睡覺打呼
+    if (!await ensureTop(run)) return;
+    const e = topEdge();
+    if (!await mcWalkTo(e.x0 + Math.random() * (e.x1 - e.x0), e.y, 150, run)) return;
+    CAT.yawn(); mcPose("sit"); mcFace("e-closed m-open"); await wait(900, run);
+    mcPose("sleep"); mcFace("e-closed");
+    const end = performance.now() + 10000 + Math.random() * 5000;
+    while (performance.now() < end) { if (!alive(run)) return; CAT.purr(); mcZ(); await wait(2600, run); }
+    if (!alive(run)) return;
+    mcPose("sit"); mcFace("e-closed m-open"); CAT.yawn(); mcSay("呼啊～"); await wait(1000, run); mcFace("");
+}
+async function bWalk(run) {         // 2 沿邊框走路、回頭看大家喵
+    if (!await ensureTop(run)) return;
+    for (let k = 0; k < 3; k++) {
+        const e = topEdge();
+        if (!await mcWalkTo(e.x0 + Math.random() * (e.x1 - e.x0), e.y, 140, run)) return;
+        MC.el.classList.add("look"); mcFace("m-open"); Math.random() < .5 ? CAT.meow() : CAT.mew();
+        mcSay(["喵～", "喵嗚？", "喵～你們好～", "喵～在玩什麼？"][Math.floor(Math.random() * 4)]);
+        if (!await wait(700, run)) return; mcFace("e-happy"); if (!await wait(900, run)) return;
+        mcFace(""); MC.el.classList.remove("look");
+    }
+}
+async function bHide(run) {         // 3 躲在玩家欄位後面舔手
+    const cards = [...document.querySelectorAll(".player-card")];
+    const c = cards[Math.floor(Math.random() * cards.length)], r = c.getBoundingClientRect();
+    if (!await mcJumpTo(r.left + r.width / 2 - MC.W / 2 + (Math.random() - .5) * r.width * .3, r.top - MC.H * .58, run, 800)) return;
+    MC.el.classList.add("hiding"); mcPose("sit"); mcFace("e-closed m-tongue"); MC.el.classList.add("lickpaw");
+    for (let k = 0; k < 6; k++) { if (!alive(run)) return; CAT.lick(); await wait(650, run); }
+    MC.el.classList.remove("lickpaw"); mcFace(""); if (!alive(run)) return;
+    CAT.mew(); mcSay("喵？（偷看）"); await wait(1500, run);
+    if (!alive(run)) return;
+    MC.el.classList.remove("hiding");
+    await ensureTop(run);
+}
+async function bUpside(run) {       // 4 倒吊在上邊框下走路
+    const u = underTop();
+    const startX = Math.random() < .5 ? u.x0 : u.x1;
+    if (!await mcJumpTo(startX, u.y, run)) return;
+    mcFlipY(true);
+    const mid = (u.x0 + u.x1) / 2;
+    if (!await mcWalkTo(mid, u.y, 120, run)) return;
+    MC.el.classList.add("look"); mcFace("m-open"); CAT.mew(); mcSay("喵？世界顛倒了～");
+    if (!await wait(1500, run)) return;
+    mcFace(""); MC.el.classList.remove("look");
+    if (!await mcWalkTo(startX === u.x0 ? u.x1 : u.x0, u.y, 120, run)) return;
+    mcFlipY(false);
+    await ensureTop(run);
+}
+async function bScared(run) {       // 5 走到右上角貓咪卡，被嚇到
+    if (!await ensureTop(run)) return;
+    const cb = $("cat-box").getBoundingClientRect();
+    const tx = cb.left - MC.W * .95, ty = cb.top + cb.height * .7 - MC.H * .95;
+    const e = topEdge();
+    if (!await mcWalkTo(Math.min(e.x1, Math.max(e.x0, tx)), e.y, 150, run)) return;
+    if (!await mcJumpTo(tx, ty, run)) return;
+    mcDir(1); mcPose("walk"); mcSay("咦？那是誰…"); if (!await wait(1400, run)) return;
+    mcPose("sit"); mcFace("e-scared m-open"); CAT.hiss(); mcSay("喵嗚！！大貓要來吃我！", 1800);
+    await new Promise(r => MC.el.animate([{ transform: "translateY(0)" }, { transform: "translateY(-70px)" }, { transform: "translateY(0)" }], { duration: 450 }).onfinish = r);
+    if (!await wait(900, run)) return;
+    mcFace("e-scared");
+    const r0 = tableRect();
+    mcDir(-1);
+    if (!await mcJumpTo(r0.left + (r0.width * .3), topEdge().y, run, 500)) return;
+    mcFace(""); await mcWalkTo(topEdge().x0 + 20, topEdge().y, 420, run);
+}
+async function bBlock(run) {        // 6 坐在答案上不給看（要用滑鼠拖走）
+    const a = $("answer").getBoundingClientRect();
+    mcK(1.5);
+    if (!await mcJumpTo(a.left + a.width / 2 - MC.W / 2, a.top + a.height * .5 - MC.H * .55, run, 750)) { mcK(1); return; }
+    mcPose("sit"); mcFace("e-happy"); MC.blocking = true; CAT.mew();
+    mcSay("嘿嘿～不給你看答案！", 2200);
+    const lines = ["喵～這裡是我的位子", "要看答案？把我拎走呀～", "呼嚕嚕～好溫暖", "喵～不給看不給看"];
+    while (alive(run)) {
+        if (!await wait(4500 + Math.random() * 2500, run)) break;
+        Math.random() < .5 ? CAT.mew() : CAT.purr();
+        mcFace(Math.random() < .5 ? "e-closed" : "e-happy");
+        mcSay(lines[Math.floor(Math.random() * lines.length)], 2000);
+    }
+}
+async function bLickToken(run) {    // 7 去舔玩家欄位的特盛圓片
+    const own = tokenObjects.filter(t => t.owner !== -1);
+    if (!own.length) return;
+    const t = own[Math.floor(Math.random() * own.length)], r = t.element.getBoundingClientRect();
+    if (!await mcJumpTo(r.right - MC.W * .3, r.bottom - MC.H * .92, run, 800)) return;
+    mcDir(-1); mcPose("sit"); mcFace("e-closed m-tongue");
+    MC.el.querySelector(".hfs").style.transform = "translate(100px,62px) rotate(-18deg)";
+    mcSay("舔舔～特盛好香！", 2200);
+    for (let k = 0; k < 8; k++) { if (!alive(run)) break; CAT.lick(); await wait(450, run); }
+    MC.el.querySelector(".hfs").style.transform = "";
+    if (!alive(run)) return;
+    mcFace("e-happy"); CAT.meow(); await wait(1000, run);
+    await ensureTop(run);
+}
+const BEHAVIORS = [["sleep", bSleep, 1], ["walk", bWalk, 2], ["hide", bHide, 1.2], ["upside", bUpside, 1], ["scared", bScared, 1], ["block", bBlock, .8], ["lick", bLickToken, 1.2]];
+async function mcLoop() {
+    while (MC.active) {
+        if (MC.dragging || isGameOverCat()) { await sleep(400); continue; }
+        const run = MC.run;
+        let pick, tries = 0;
+        do {
+            let sum = BEHAVIORS.reduce((a, b) => a + b[2], 0), r = Math.random() * sum;
+            pick = BEHAVIORS.find(b => (r -= b[2]) < 0) || BEHAVIORS[0];
+        } while (pick[0] === MC.last && ++tries < 5);
+        MC.last = pick[0];
+        try { await pick[1](run); } catch (e) {}
+        if (run !== MC.run) continue;           // 被拎走了
+        mcPose("sit"); mcFace("");
+        const idle = 2500 + Math.random() * 3500, end = performance.now() + idle;
+        while (performance.now() < end && alive(run)) { await sleep(900); if (Math.random() < .35) await blink(run); }
+    }
+}
+function isGameOverCat() { return false; }
+
+/* ---- 拎起來（拖曳） ---- */
+let angryTimer = null;
+function mcGrab(e) {
+    e.preventDefault(); ensureAudio();
+    MC.run++; MC.dragging = true; MC.blocking = false;
+    MC.el.classList.remove("hiding", "look", "lickpaw", "walking");
+    MC.el.querySelector(".hfs").style.transform = "";
+    mcFlipY(false); mcK(1); mcDir(1);
+    mcPose("hang"); mcFace("e-angry m-open"); MC.el.classList.add("dragging");
+    mcDrag(e);
+    CAT.angry(); mcSay("喵嗷！放開我！");
+    const lines = ["喵嗷！放開我！", "哈～嘶！", "喵喵喵！！", "不要拎我啦！"];
+    angryTimer = setInterval(() => { CAT.angry(); mcSay(lines[Math.floor(Math.random() * lines.length)]); }, 1100);
+    window.addEventListener("pointermove", mcDrag);
+    window.addEventListener("pointerup", mcDrop);
+}
+function mcDrag(e) { mcPlace(e.clientX - MC.W / 2, e.clientY - MC.H * .06); }
+async function mcDrop() {
+    clearInterval(angryTimer);
+    window.removeEventListener("pointermove", mcDrag);
+    window.removeEventListener("pointerup", mcDrop);
+    MC.el.classList.remove("dragging");
+    mcPose("sit"); mcFace("e-angry"); CAT.huff(); mcSay("哼！", 1500);
+    MC.el.animate([{ transform: "translateY(-30px)" }, { transform: "translateY(0)" }, { transform: "translateY(-8px)" }, { transform: "translateY(0)" }], { duration: 450 });
+    await sleep(1600);
+    mcFace("");
+    MC.dragging = false;
+}
+
+function startMascot() {
+    if (MC.active) return;
+    MC.W = Math.max(110, Math.min(175, window.innerWidth * .085)); MC.H = MC.W * .8;
+    MC.el = document.createElement("div");
+    MC.el.id = "mcat";
+    MC.el.style.setProperty("--mw", MC.W + "px");
+    document.body.style.setProperty("--mw", MC.W + "px");
+    document.body.classList.add("has-mcat");
+    setTimeout(positionTokensNoAnimation, 700);
+    MC.el.innerHTML = `<div class="mc-bubble"></div><div class="mc-flip">${catSVG()}</div>`;
+    document.body.appendChild(MC.el);
+    MC.el.addEventListener("pointerdown", mcGrab);
+    MC.active = true;
+    (async () => {
+        await sleep(700);                 // 等版面讓出上方空間
+        const e = topEdge();
+        mcPlace(-MC.W - 20, e.y);
+        const run = MC.run;
+        CAT.meow(); mcSay("喵～我來了！");
+        await mcWalkTo(e.x0 + (e.x1 - e.x0) * .3, e.y, 160, run);
+        if (alive(run)) { MC.el.classList.add("look"); mcFace("e-happy m-open"); CAT.mew(); mcSay("喵～大家好！特盛都被拿光了～"); await wait(2200, run); mcFace(""); MC.el.classList.remove("look"); }
+        mcLoop();
+    })();
+}
+function checkMascot() { if (!MC.active && tokenObjects.every(t => t.owner !== -1)) setTimeout(startMascot, 1500); }
+
+</script>
+</body>
+</html>

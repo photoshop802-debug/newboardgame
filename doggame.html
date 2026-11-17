@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>惡犬來襲！GaoGao 骨頭爭奪戰 v7 暗雷版</title>
+<style>
+:root{ --red:#d90429; --dark:#2b2d42; --gold:#ffd700; }
+*{box-sizing:border-box;}
+html,body{height:100%;margin:0;}
+body{
+    font-family:'PingFang TC','Microsoft JhengHei',system-ui,sans-serif;
+    background:#f3ead8;color:var(--dark);overflow:hidden;user-select:none;
+}
+button{
+    font-family:inherit;background:var(--red);color:#fff;border:none;font-weight:bold;cursor:pointer;
+    padding:12px 28px;font-size:17px;border-radius:14px;transition:all .2s;
+}
+button:hover{filter:brightness(1.1);transform:translateY(-2px);}
+
+/* ===== 設定玩家 ===== */
+#setup-panel{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    background:#fff;padding:26px 30px;border-radius:22px;box-shadow:0 10px 30px rgba(0,0,0,.12);
+    width:min(500px,92vw);text-align:center;max-height:94vh;overflow:auto;
+}
+#setup-panel h1{margin:0;color:var(--red);font-size:30px;}
+.setup-group{margin:14px 0;text-align:left;}
+.setup-group label{font-weight:bold;display:block;margin-bottom:6px;}
+.setup-group input,.setup-group select{width:100%;padding:10px;border:2px solid #ddd;border-radius:10px;font-size:16px;font-family:inherit;}
+#player-names-container{max-height:300px;overflow-y:auto;padding-right:4px;}
+#player-names-container input{margin-bottom:6px;}
+
+/* ===== 遊戲畫面 ===== */
+#game{display:none;height:100vh;flex-direction:column;padding:10px 12px 12px;gap:10px;}
+#game.on{display:flex;}
+#stage{
+    position:relative;flex:1;min-height:0;border-radius:26px;overflow:hidden;
+    background:
+        linear-gradient(to bottom, #ffe9c7 0%, #ffd9a3 58%, #c98f55 58.2%, #b77b43 100%);
+    border:6px solid #b07a42;
+}
+#stage.shake{animation:stageShake .07s infinite;}
+@keyframes stageShake{
+    0%{transform:translate(9px,-7px) rotate(.6deg);}
+    50%{transform:translate(-10px,8px) rotate(-.6deg);}
+    100%{transform:translate(7px,6px) rotate(.3deg);}
+}
+#stage.dim::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 35%,transparent 30%,rgba(0,0,0,.45));pointer-events:none;z-index:6;}
+
+/* 狗 */
+.dog-box{position:absolute;left:50%;top:1%;height:74%;aspect-ratio:3/2;transform:translateX(-50%);pointer-events:none;}
+#dog-wrap{z-index:2;}
+#dog-wrap.front{z-index:10;}
+#paws-wrap{z-index:4;}
+#dog-lunge,#paws-lunge{width:100%;height:100%;transform-origin:50% 85%;}
+.dog-box svg{width:100%;height:100%;overflow:visible;}
+#dog-pose,#paws-pose{transform-box:view-box;transform-origin:300px 380px;transition:transform .9s cubic-bezier(.4,1.5,.5,1);}
+#dog-breath{transform-box:view-box;transform-origin:300px 360px;}
+#dog-body{transform-box:view-box;transform-origin:300px 400px;}
+#nose{transform-box:view-box;transform-origin:300px 212px;}
+#jowls{transform-box:view-box;transform-origin:300px 250px;}
+#jaw-g,#jaw-teeth{transform-box:view-box;transform-origin:300px 300px;}
+#mouth-open{transform-box:view-box;transform-origin:300px 300px;opacity:0;}
+#eyeL-open{transform-box:view-box;transform-origin:226px 168px;}
+#eyeR-open{transform-box:view-box;transform-origin:374px 168px;}
+#ear-l{transform-box:view-box;transform-origin:180px 110px;}
+#ear-r{transform-box:view-box;transform-origin:420px 110px;}
+#drool{transform-box:view-box;transform-origin:232px 322px;opacity:0;}
+#tongue-lick{transform-box:view-box;transform-origin:300px 300px;opacity:0;}
+
+/* 骨頭盆（橫跨整個寬度，每位玩家上方都有骨頭） */
+#trough{
+    position:absolute;left:1.2%;right:1.2%;bottom:2.5%;height:34%;z-index:3;
+    border-radius:46px 46px 38px 38px;
+    background:linear-gradient(to bottom,#7fd884 0%,#4cb052 30%,#3a9d40 100%);
+    border:5px solid #2d7d32;border-bottom:20px solid #1b5e20;
+    box-shadow:0 14px 26px rgba(0,0,0,.35), inset 0 10px 18px rgba(255,255,255,.25), inset 0 -16px 24px rgba(0,0,0,.18);
+}
+#trough::after{
+    content:"GAOGAO FOODPOOL";position:absolute;bottom:-19px;left:0;right:0;text-align:center;
+    color:#ffeb3b;font-size:14px;font-weight:900;letter-spacing:6px;opacity:.85;
+}
+#bone-field{position:absolute;left:2%;right:2%;top:15%;bottom:6%;}
+.bone{
+    position:absolute;width:var(--bw,96px);aspect-ratio:100/40;cursor:grab;touch-action:none;
+    transform:translate(-50%,-50%) rotate(var(--r,0deg));transition:transform .12s, filter .12s;z-index:5;
+    filter:drop-shadow(0 3px 2px rgba(0,0,0,.3));
+}
+.bone svg{width:100%;height:100%;display:block;pointer-events:none;}
+.bone:hover{transform:translate(-50%,-50%) rotate(var(--r,0deg)) scale(1.18);filter:drop-shadow(0 0 10px #fff) drop-shadow(0 0 6px #ffeb3b);z-index:9;}
+.bone.dragging{
+    position:fixed;z-index:9999;cursor:grabbing;
+    transform:translate(-50%,-50%) rotate(var(--r,0deg)) scale(1.25);
+    filter:drop-shadow(0 10px 12px rgba(0,0,0,.45));transition:none;
+}
+
+/* 左上 HUD */
+#hud{
+    position:absolute;left:14px;top:14px;z-index:20;width:clamp(210px,19vw,330px);
+    background:rgba(255,255,255,.95);border-radius:22px;padding:14px 16px;
+    box-shadow:0 6px 18px rgba(0,0,0,.15);border:5px solid var(--red);
+}
+#hud.pop{animation:hudPop .6s cubic-bezier(.3,1.6,.5,1);}
+@keyframes hudPop{0%{transform:scale(.7);}100%{transform:scale(1);}}
+.hud-label{font-size:clamp(13px,1vw,17px);color:#888;font-weight:bold;}
+#hud-name{font-size:clamp(24px,2.4vw,42px);font-weight:900;color:var(--red);line-height:1.15;word-break:break-all;}
+#hud-take{font-size:clamp(18px,1.6vw,28px);font-weight:900;margin-top:6px;}
+#hud-take b{font-size:1.5em;color:var(--red);}
+#hud-bones{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;}
+.slot{width:clamp(40px,3.6vw,64px);aspect-ratio:100/40;position:relative;}
+.slot svg{width:100%;height:100%;}
+.slot.got{opacity:.35;}
+.slot.got::after{content:'✔';position:absolute;inset:-6px 0 0 0;text-align:center;color:#1b9e4b;font-weight:900;font-size:clamp(18px,1.6vw,28px);opacity:1;}
+#hud-msg{margin-top:8px;font-size:clamp(14px,1.15vw,19px);font-weight:bold;color:#444;min-height:1.3em;}
+#hud-timer{display:none;align-items:center;gap:10px;margin-top:8px;}
+#hud-timer.on{display:flex;}
+#hud-timer svg{width:clamp(44px,4vw,64px);height:clamp(44px,4vw,64px);transform:rotate(-90deg);}
+#timer-ring{transition:stroke-dashoffset .25s linear;}
+#timer-num{font-size:clamp(22px,2vw,36px);font-weight:900;}
+#hud-timer.hurry #timer-num{color:var(--red);animation:hudPop .5s infinite;}
+#hud-timer.hurry #timer-ring{stroke:var(--red);}
+
+#debug-box{
+    display:none;position:absolute;left:14px;bottom:38%;z-index:20;background:rgba(0,0,0,.65);color:#fff;
+    padding:6px 10px;border-radius:10px;font-size:13px;line-height:1.5;
+}
+#debug-box.on{display:block;}
+
+/* 打呼 Z 與小對話泡泡 */
+.zz{position:absolute;z-index:7;font-weight:900;color:#3a86ff;pointer-events:none;text-shadow:0 2px 0 #fff,0 0 8px #fff;}
+.say{
+    position:absolute;z-index:8;background:#fff;border-radius:18px;padding:6px 14px;font-weight:900;
+    font-size:clamp(18px,1.6vw,28px);box-shadow:0 4px 12px rgba(0,0,0,.2);pointer-events:none;white-space:nowrap;
+}
+
+/* 咬人特效 */
+#flash{position:fixed;inset:0;z-index:70;pointer-events:none;opacity:0;background:#fff;}
+#speedlines{
+    position:fixed;inset:-20%;z-index:69;pointer-events:none;opacity:0;
+    background:repeating-conic-gradient(from 0deg at 50% 40%, rgba(0,0,0,0) 0deg 5deg, rgba(120,0,0,.35) 5deg 7deg);
+    -webkit-mask:radial-gradient(circle at 50% 40%, transparent 18%, #000 55%);
+            mask:radial-gradient(circle at 50% 40%, transparent 18%, #000 55%);
+}
+#gao-text{
+    position:fixed;left:70%;top:20%;z-index:72;pointer-events:none;opacity:0;
+    font-size:clamp(90px,13vw,240px);font-weight:900;color:#ffe600;font-style:italic;letter-spacing:4px;
+    -webkit-text-stroke:8px #b00012;paint-order:stroke fill;text-shadow:0 10px 0 rgba(0,0,0,.35);
+    transform:translate(-50%,-50%);white-space:nowrap;
+}
+
+/* 下方玩家籃子 */
+#player-area{display:grid;gap:10px;height:clamp(110px,18vh,190px);flex:none;}
+.basket{
+    position:relative;background:#fff;border:4px dashed #cbd5e1;border-radius:18px;padding:8px;
+    text-align:center;display:flex;flex-direction:column;align-items:center;overflow:hidden;transition:all .2s;
+}
+.basket-title{font-size:clamp(15px,1.3vw,22px);font-weight:900;}
+.basket-score{font-size:clamp(14px,1.2vw,20px);font-weight:bold;}
+.basket-inventory{display:flex;flex-wrap:wrap;gap:3px;justify-content:center;margin-top:4px;}
+.mini-bone{width:26px;height:11px;}
+.basket .now{display:none;margin-top:auto;background:var(--red);color:#fff;border-radius:10px;padding:2px 10px;font-weight:900;font-size:clamp(13px,1.1vw,18px);}
+.basket.active{border:5px solid var(--red);background:#ffe3e3;animation:activeGlow 1.2s infinite;}
+.basket.active .now{display:block;}
+@keyframes activeGlow{0%,100%{box-shadow:0 0 0 0 rgba(217,4,41,.4);}50%{box-shadow:0 0 22px 6px rgba(217,4,41,.55);}}
+.basket.hovered{background:#d1fae5;border-color:#10b981;transform:scale(1.04);}
+.basket.eliminated{background:#334155 !important;border-color:#1e293b !important;color:#94a3b8 !important;opacity:.6;transform:scale(.95);animation:none;}
+.basket.eliminated .basket-title{text-decoration:line-through;}
+.basket.eliminated .now{display:none;}
+.basket.winner-crown{
+    background:linear-gradient(135deg,#fffbeb,#fef3c7) !important;border:5px solid var(--gold) !important;
+    box-shadow:0 0 25px rgba(255,215,0,.8) !important;color:#92400e !important;animation:winnerJump .5s infinite alternate ease-in-out;
+}
+@keyframes winnerJump{0%{transform:translateY(0);}100%{transform:translateY(-12px);}}
+.chomp{position:absolute;inset:0;pointer-events:none;z-index:5;}
+.chomp svg{position:absolute;left:0;width:100%;height:50%;}
+
+/* 暗雷 / 顏色 */
+.bone.boom{animation:boomShake .12s infinite;filter:drop-shadow(0 0 16px #ff0018) drop-shadow(0 0 8px #ffe600) !important;z-index:20;}
+@keyframes boomShake{0%{transform:translate(-50%,-50%) rotate(var(--r,0deg)) scale(1.4);}50%{transform:translate(-52%,-48%) rotate(var(--r,0deg)) scale(1.55);}100%{transform:translate(-48%,-52%) rotate(var(--r,0deg)) scale(1.4);}}
+.debug-on #bone-field .bone[data-mine="1"]{outline:4px dashed #ff0018;outline-offset:3px;border-radius:10px;}
+.cc{display:inline-block;padding:0 12px;border-radius:12px;border:3px solid rgba(0,0,0,.45);color:#000;font-weight:900;margin:2px 2px;}
+.cc.white{background:#fafafa;} .cc.red{background:#ff4040;color:#fff;} .cc.blue{background:#3d8bff;color:#fff;} .cc.yellow{background:#ffd93b;}
+.basket.bitten{animation:bittenFlash .3s 4;}
+@keyframes bittenFlash{0%,100%{background:#fff;}50%{background:#ffb3b3;}}
+#settings-card h3{margin:16px 0 6px;font-size:18px;border-top:2px solid #eee;padding-top:12px;}
+#settings-card select{width:100%;padding:8px;border-radius:10px;border:2px solid #ddd;font-size:15px;font-family:inherit;}
+.hint{font-size:13px;color:#888;margin-top:4px;}
+#setup-summary{background:#fff5e6;border-radius:12px;padding:10px;font-size:15px;color:#7a4a10;margin:6px 0 14px;}
+.hearts{font-size:clamp(16px,1.5vw,26px);line-height:1.1;letter-spacing:2px;}
+.hearts .lost{filter:grayscale(1);opacity:.35;}
+.hearts.hit{animation:bump .5s 2;}
+@keyframes bump{0%{transform:scale(1);}40%{transform:scale(1.5);}100%{transform:scale(1);}}
+/* 齒輪、靜音 */
+.round-btn{
+    position:fixed;top:16px;z-index:80;width:52px;height:52px;padding:0;border-radius:50%;
+    font-size:27px;background:#fff;color:#333;box-shadow:0 3px 10px rgba(0,0,0,.2);
+}
+#gear-btn{right:20px;}
+#gear-btn:hover{transform:rotate(60deg);}
+#mute-btn{right:82px;}
+#settings-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:90;align-items:center;justify-content:center;}
+#settings-overlay.on{display:flex;}
+#settings-card{background:#fff;border-radius:22px;padding:22px 28px;width:min(470px,92vw);max-height:92vh;overflow:auto;}
+#settings-card h2{margin:0 0 14px;}
+.srow{margin:8px 0 14px;}
+.srow label{font-weight:bold;display:block;margin-bottom:6px;}
+.srow input[type=range]{width:100%;}
+.chk{display:flex;align-items:center;gap:10px;font-size:16px;margin:10px 0;cursor:pointer;}
+.chk input{width:22px;height:22px;}
+.sbtns{display:flex;gap:10px;justify-content:center;margin-top:14px;flex-wrap:wrap;}
+button.gray{background:#6c757d;}
+
+/* 結算 */
+#end-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:85;align-items:center;justify-content:center;}
+#end-overlay.on{display:flex;}
+#end-card{background:#fff;border-radius:24px;padding:28px 40px;text-align:center;width:min(560px,92vw);max-height:90vh;overflow:auto;}
+#end-card h1{margin:0 0 10px;color:var(--red);}
+#end-list{text-align:left;font-size:18px;line-height:1.8;margin:14px 0;}
+</style>
+</head>
+<body>
+
+<button class="round-btn" id="mute-btn" title="靜音 / 開聲音" onclick="toggleMute()">🔊</button>
+<button class="round-btn" id="gear-btn" title="設定" onclick="openSettings()">⚙️</button>
+
+<div id="setup-panel">
+    <h1>🐶 惡犬來襲！</h1>
+    <p style="margin:6px 0 0;color:#666;">GaoGao 骨頭爭奪戰【暗雷版】——有骨頭一碰狗就醒！</p>
+    <div class="setup-group">
+        <label for="player-count">玩家人數 (2 - 10人)：</label>
+        <select id="player-count" onchange="generatePlayerInputs()">
+            <option value="2">2 人</option><option value="3" selected>3 人</option><option value="4">4 人</option>
+            <option value="5">5 人</option><option value="6">6 人</option><option value="7">7 人</option>
+            <option value="8">8 人</option><option value="9">9 人</option><option value="10">10 人</option>
+        </select>
+    </div>
+    <div class="setup-group">
+        <label>玩家名稱：</label>
+        <div id="player-names-container"></div>
+    </div>
+    <div id="setup-summary"></div>
+    <button onclick="startGame()">開始冒險 🍖</button>
+</div>
+
+<div id="game">
+    <div id="stage">
+        <!-- 狗本體（在骨頭盆後面） -->
+        <div class="dog-box" id="dog-wrap"><div id="dog-lunge">
+        <svg viewBox="0 0 600 400">
+            <defs>
+                <radialGradient id="gHead" cx="50%" cy="32%" r="68%">
+                    <stop offset="0" stop-color="#a95f2c"/><stop offset=".65" stop-color="#8a4520"/><stop offset="1" stop-color="#5a2a10"/>
+                </radialGradient>
+                <radialGradient id="gMuzzle" cx="50%" cy="25%" r="75%">
+                    <stop offset="0" stop-color="#f3cfa6"/><stop offset="1" stop-color="#c98b58"/>
+                </radialGradient>
+                <radialGradient id="gBody" cx="50%" cy="20%" r="80%">
+                    <stop offset="0" stop-color="#94512a"/><stop offset="1" stop-color="#5a2a10"/>
+                </radialGradient>
+                <linearGradient id="gFang" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="#ffffff"/><stop offset=".7" stop-color="#f6ecd0"/><stop offset="1" stop-color="#d9c79c"/>
+                </linearGradient>
+                <radialGradient id="gMaw" cx="50%" cy="40%" r="60%">
+                    <stop offset="0" stop-color="#2a0205"/><stop offset=".7" stop-color="#6b0a12"/><stop offset="1" stop-color="#9a1420"/>
+                </radialGradient>
+            </defs>
+            <g id="dog-pose">
+                <g id="dog-body">
+                    <ellipse cx="300" cy="405" rx="255" ry="128" fill="url(#gBody)" stroke="#3e1c08" stroke-width="3"/>
+                    <ellipse cx="300" cy="410" rx="120" ry="70" fill="#c98b58" opacity=".85"/>
+                    <path d="M200,330 Q300,350 400,330" stroke="#3e1c08" stroke-width="5" fill="none" opacity=".5"/>
+                </g>
+                <g id="dog-breath">
+                    <g id="ear-l">
+                        <path d="M186,100 C150,80 104,92 92,134 C112,124 136,126 150,146 C160,128 172,112 186,100 Z" fill="#4d230d" stroke="#2e1406" stroke-width="3"/>
+                        <path d="M110,124 C128,114 146,116 160,128" stroke="#2e1406" stroke-width="4" fill="none"/>
+                    </g>
+                    <g id="ear-r">
+                        <path d="M414,100 C450,80 496,92 508,134 C488,124 464,126 450,146 C440,128 428,112 414,100 Z" fill="#4d230d" stroke="#2e1406" stroke-width="3"/>
+                        <path d="M490,124 C472,114 454,116 440,128" stroke="#2e1406" stroke-width="4" fill="none"/>
+                    </g>
+                    <path d="M164,150 C156,100 214,80 300,80 C386,80 444,100 436,150 C462,200 464,266 424,304 C392,340 208,340 176,304 C136,266 138,200 164,150 Z" fill="url(#gHead)" stroke="#4a210b" stroke-width="3"/>
+                    <g stroke="#5a2a10" stroke-width="5" fill="none" stroke-linecap="round" opacity=".85">
+                        <path d="M248,104 Q300,88 352,104"/><path d="M260,122 Q300,110 340,122"/><path d="M300,96 L300,148"/>
+                        <path d="M198,142 Q214,124 240,128"/><path d="M402,142 Q386,124 360,128"/>
+                    </g>
+                    <ellipse cx="226" cy="168" rx="42" ry="27" fill="#6a3214"/>
+                    <ellipse cx="374" cy="168" rx="42" ry="27" fill="#6a3214"/>
+                    <!-- 閉眼（下垂眼皮） -->
+                    <g id="eyeL-closed">
+                        <path d="M186,166 Q226,140 266,166 Q226,190 186,166 Z" fill="#7d3c19"/>
+                        <path d="M188,166 Q226,192 264,166" stroke="#1e0c03" stroke-width="7" fill="none" stroke-linecap="round"/>
+                        <path d="M200,176 L194,186 M214,182 L211,193 M230,184 L230,195" stroke="#1e0c03" stroke-width="3" stroke-linecap="round"/>
+                    </g>
+                    <g id="eyeR-closed">
+                        <path d="M334,166 Q374,140 414,166 Q374,190 334,166 Z" fill="#7d3c19"/>
+                        <path d="M336,166 Q374,192 412,166" stroke="#1e0c03" stroke-width="7" fill="none" stroke-linecap="round"/>
+                        <path d="M400,176 L406,186 M386,182 L389,193 M370,184 L370,195" stroke="#1e0c03" stroke-width="3" stroke-linecap="round"/>
+                    </g>
+                    <!-- 睜眼（兇） -->
+                    <g id="eyeL-open" style="display:none">
+                        <ellipse cx="226" cy="168" rx="33" ry="25" fill="#fff6dc" stroke="#1e0c03" stroke-width="4"/>
+                        <path d="M196,162 L210,166 M198,176 L212,172 M254,160 L242,165" stroke="#e0303a" stroke-width="2"/>
+                        <circle cx="232" cy="170" r="16" fill="#ffae00" stroke="#7a3d00" stroke-width="2"/>
+                        <circle cx="232" cy="170" r="8" fill="#000"/>
+                        <circle cx="236" cy="165" r="3.5" fill="#fff"/>
+                    </g>
+                    <g id="eyeR-open" style="display:none">
+                        <ellipse cx="374" cy="168" rx="33" ry="25" fill="#fff6dc" stroke="#1e0c03" stroke-width="4"/>
+                        <path d="M404,162 L390,166 M402,176 L388,172 M346,160 L358,165" stroke="#e0303a" stroke-width="2"/>
+                        <circle cx="368" cy="170" r="16" fill="#ffae00" stroke="#7a3d00" stroke-width="2"/>
+                        <circle cx="368" cy="170" r="8" fill="#000"/>
+                        <circle cx="372" cy="165" r="3.5" fill="#fff"/>
+                    </g>
+                    <g id="brows" style="display:none" stroke="#1e0c03" stroke-width="13" stroke-linecap="round">
+                        <path d="M176,126 L266,152"/><path d="M424,126 L334,152"/>
+                    </g>
+                    <!-- 口鼻 -->
+                    <path d="M222,192 C236,172 364,172 378,192 C420,206 442,250 422,286 C402,318 198,318 178,286 C158,250 180,206 222,192 Z" fill="url(#gMuzzle)"/>
+                    <path d="M194,228 Q184,256 196,282" stroke="#b07a48" stroke-width="4" fill="none"/>
+                    <path d="M406,228 Q416,256 404,282" stroke="#b07a48" stroke-width="4" fill="none"/>
+                    <!-- 張嘴內部 -->
+                    <g id="mouth-open">
+                        <ellipse cx="300" cy="318" rx="122" ry="66" fill="url(#gMaw)" stroke="#2a0205" stroke-width="4"/>
+                        <path d="M244,356 C256,322 344,322 356,356 C344,380 256,380 244,356 Z" fill="#d94a5c"/>
+                        <path d="M300,334 L300,366" stroke="#9e2a3c" stroke-width="3"/>
+                    </g>
+                    <!-- 下巴（戽斗） -->
+                    <g id="jaw-g">
+                        <path d="M210,296 C212,354 388,354 390,296 C360,318 240,318 210,296 Z" fill="#c98b58" stroke="#8a5a30" stroke-width="3"/>
+                    </g>
+                    <g id="tongue-lick">
+                        <path d="M280,300 C278,352 322,352 320,300 Z" fill="#e8607a" stroke="#b03a50" stroke-width="2"/>
+                        <path d="M300,306 L300,334" stroke="#b03a50" stroke-width="2"/>
+                    </g>
+                    <!-- 上嘴唇（垂肉） -->
+                    <g id="jowls">
+                        <path d="M300,248 C268,246 212,248 192,276 C186,314 232,336 272,326 C296,318 302,292 300,268 Z" fill="#dca06c" stroke="#a86e3e" stroke-width="3"/>
+                        <path d="M300,248 C332,246 388,248 408,276 C414,314 368,336 328,326 C304,318 298,292 300,268 Z" fill="#dca06c" stroke="#a86e3e" stroke-width="3"/>
+                        <g fill="#8a5a30"><circle cx="236" cy="272" r="3"/><circle cx="252" cy="282" r="3"/><circle cx="228" cy="290" r="3"/>
+                            <circle cx="364" cy="272" r="3"/><circle cx="348" cy="282" r="3"/><circle cx="372" cy="290" r="3"/></g>
+                        <g id="upper-teeth" style="display:none" fill="#fffbe8" stroke="#9a8a70" stroke-width="2">
+                            <path d="M222,318 L236,366 L250,316 Z"/><path d="M350,316 L364,366 L378,318 Z"/>
+                            <path d="M258,322 L266,344 L274,323 Z"/><path d="M276,324 L284,346 L292,324 Z"/>
+                            <path d="M308,324 L316,346 L324,324 Z"/><path d="M326,323 L334,344 L342,322 Z"/>
+                        </g>
+                    </g>
+                    <g id="nose">
+                        <path d="M252,202 C252,178 348,178 348,202 C348,232 322,246 300,246 C278,246 252,232 252,202 Z" fill="#1a1a1a"/>
+                        <ellipse cx="281" cy="219" rx="11" ry="7" fill="#000"/><ellipse cx="319" cy="219" rx="11" ry="7" fill="#000"/>
+                        <ellipse cx="286" cy="192" rx="20" ry="6" fill="#fff" opacity=".35"/>
+                    </g>
+                    <path d="M300,246 L300,262" stroke="#a86e3e" stroke-width="4"/>
+                    <!-- 下排獠牙（戽斗露牙） -->
+                    <g id="jaw-teeth" stroke="#8a7a5c" stroke-width="2.5" stroke-linejoin="round">
+                        <path d="M226,350 C224,330 226,306 238,284 C246,302 252,326 252,350 Z" fill="url(#gFang)"/>
+                        <path d="M374,350 C376,330 374,306 362,284 C354,302 348,326 348,350 Z" fill="url(#gFang)"/>
+                        <path d="M234,340 C234,322 236,308 239,296" stroke="#fff" stroke-width="3" fill="none" opacity=".8"/>
+                        <path d="M366,340 C366,322 364,308 361,296" stroke="#fff" stroke-width="3" fill="none" opacity=".8"/>
+                    </g>
+                    <path id="drool" d="M232,320 C226,334 222,346 232,356 C242,346 238,334 232,320 Z" fill="#c9f0ff" stroke="#6fbfe0" stroke-width="2"/>
+                </g>
+            </g>
+        </svg>
+        </div></div>
+
+        <div id="trough"><div id="bone-field"></div></div>
+
+        <!-- 前腳（壓在盆邊） -->
+        <div class="dog-box" id="paws-wrap"><div id="paws-lunge">
+        <svg viewBox="0 0 600 400">
+            <g id="paws-pose">
+                <g>
+                    <ellipse cx="160" cy="336" rx="68" ry="30" fill="#8a4520" stroke="#4a210b" stroke-width="3"/>
+                    <ellipse cx="160" cy="348" rx="56" ry="17" fill="#c98b58"/>
+                    <path d="M134,340 L134,360 M160,342 L160,364 M186,340 L186,360" stroke="#7a4a28" stroke-width="4" stroke-linecap="round"/>
+                </g>
+                <g>
+                    <ellipse cx="440" cy="336" rx="68" ry="30" fill="#8a4520" stroke="#4a210b" stroke-width="3"/>
+                    <ellipse cx="440" cy="348" rx="56" ry="17" fill="#c98b58"/>
+                    <path d="M414,340 L414,360 M440,342 L440,364 M466,340 L466,360" stroke="#7a4a28" stroke-width="4" stroke-linecap="round"/>
+                </g>
+            </g>
+        </svg>
+        </div></div>
+
+        <div id="hud">
+            <div class="hud-label">輪到</div>
+            <div id="hud-name">玩家 1</div>
+            <div id="hud-take">要拿 <b>1</b> 根</div>
+            <div id="hud-bones"></div>
+            <div id="hud-timer">
+                <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="#eee" stroke-width="6"/>
+                    <circle id="timer-ring" cx="20" cy="20" r="16" fill="none" stroke="#2b2d42" stroke-width="6" stroke-dasharray="100.5" stroke-dashoffset="0" stroke-linecap="round"/></svg>
+                <div id="timer-num">20 秒</div>
+            </div>
+            <div id="hud-msg"></div>
+        </div>
+        <div id="debug-box"></div>
+    </div>
+
+    <div id="player-area"></div>
+</div>
+
+<div id="flash"></div>
+<div id="speedlines"></div>
+<div id="gao-text">GAO!!</div>
+
+<div id="settings-overlay" onclick="if(event.target===this) closeSettings()">
+    <div id="settings-card">
+        <h2>⚙️ 遊戲設定</h2>
+        <h3>💣 暗雷（改了「下一局」才生效）</h3>
+        <label class="chk"><input type="checkbox" id="s-auto"> 依人數自動用建議的骨頭與暗雷數</label>
+        <div id="custom-row">
+            <div class="srow"><label>骨頭 <b id="bn-val">28</b> 根</label><input type="range" id="s-bones" min="8" max="40" step="1"></div>
+            <div class="srow"><label>暗雷 <b id="mn-val">1</b> 根</label><input type="range" id="s-mines" min="1" max="8" step="1"></div>
+        </div>
+        <div class="srow">
+            <label>被咬到以後：</label>
+            <select id="s-bitemode">
+                <option value="out">出局淘汰：骨頭倒回盤子，狗再偷藏新暗雷，剩最後一人獲勝</option>
+                <option value="reset">不出局：骨頭全部倒回盤子，暗雷用掉就沒了，骨頭拿光時最多者獲勝</option>
+            </select>
+        </div>
+        <div class="srow" id="hp-row">
+            <label>❤️ 血量模式：每人 <b id="hp-val">1</b> 滴血</label>
+            <input type="range" id="s-hp" min="1" max="5" step="1">
+            <div class="hint">1 滴 = 被咬就出局（原本玩法）。2 滴以上：被咬扣 1 滴血、骨頭倒回盤子，血扣光才出局。只在「出局淘汰」有效。</div>
+        </div>
+        <div id="out-extra">
+            <div class="srow">
+                <label>🏁 遊戲結束方式：</label>
+                <select id="s-endmode">
+                    <option value="survive">存活模式：玩到剩最後一人存活就獲勝</option>
+                    <option value="score">計分模式：有人被咬死（血量歸 0）就結束，全部人依骨頭數排名</option>
+                </select>
+            </div>
+            <div class="srow">
+                <label>🦴 被咬到以後，他的骨頭：</label>
+                <select id="s-bonekeep">
+                    <option value="return">倒回狗的盤子（不算分）</option>
+                    <option value="keep">留在自己的籃子（被咬死也能比骨頭、排名次）</option>
+                </select>
+            </div>
+            <div class="hint">這兩項只在「出局淘汰」有效。</div>
+        </div>
+        <h3>🎨 指定顏色（下一位玩家起生效）</h3>
+        <select id="s-color">
+            <option value="off">不指定顏色（任何骨頭都可以）</option>
+            <option value="single">指定一種顏色（例：拿 2 根藍色）</option>
+            <option value="mix">可以混色（例：1 根紅色 + 1 根黃色）</option>
+        </select>
+        <div class="hint">系統只會出「盤子裡真的有」的顏色和數量，不會出錯指令。</div>
+        <h3>⏰ 時間與聲音</h3>
+        <label class="chk"><input type="checkbox" id="s-tl"> ⏰ 限時（輪到的人要在時間內拿完，否則狗會咬他）</label>
+        <div class="srow" id="tl-row">
+            <label>每回合限時 <b id="tl-val">20</b> 秒</label>
+            <input type="range" id="s-tlsec" min="5" max="90" step="1">
+        </div>
+        <div class="srow">
+            <label>音量 <b id="vol-val">80</b>%</label>
+            <input type="range" id="s-vol" min="0" max="1" step="0.05">
+        </div>
+        <label class="chk"><input type="checkbox" id="s-sound"> 🎵 音效</label>
+        <label class="chk"><input type="checkbox" id="s-breath"> 😴 狗的呼吸與打呼聲</label>
+        <label class="chk"><input type="checkbox" id="s-voice"> 🗣️ 語音（輪到誰、拿幾根）</label>
+        <label class="chk"><input type="checkbox" id="s-debug"> 🔍 顯示暗雷在哪裡（紅框，老師測試用，別給學生看）</label>
+        <div class="sbtns">
+            <button class="gray" onclick="testSound()">🔊 試聽打呼</button>
+            <button onclick="closeSettings()">完成</button>
+        </div>
+        <div class="sbtns"><button class="gray" onclick="location.reload()">🏠 回主選單（重新開始）</button></div>
+    </div>
+</div>
+
+<div id="end-overlay">
+    <div id="end-card">
+        <h1 id="end-title">🏁 戰局結算</h1>
+        <div id="end-msg" style="font-size:20px;font-weight:bold;"></div>
+        <div id="end-list"></div>
+        <button onclick="location.reload()">再玩一局</button>
+    </div>
+</div>
+
+<script>
+/* ================= 設定 ================= */
+const DEFAULT_SETTINGS = { timeLimitOn: false, timeLimitSec: 20, volume: 0.8, sound: true, breath: true, voice: true, debug: false,
+    autoCounts: true, bonesCustom: 28, minesCustom: 1, biteMode: "out", colorMode: "off", hp: 1, endMode: "survive", boneKeep: "return" };
+const SETTINGS_KEY = "gaogaoSettingsV7";
+function loadSettings() { try { return Object.assign({}, DEFAULT_SETTINGS, JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}")); } catch (e) { return Object.assign({}, DEFAULT_SETTINGS); } }
+function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {} }
+let settings = loadSettings();
+const $ = id => document.getElementById(id);
+
+function openSettings() {
+    ensureAudio();
+    $("s-tl").checked = settings.timeLimitOn;
+    $("s-tlsec").value = settings.timeLimitSec; $("tl-val").textContent = settings.timeLimitSec;
+    $("tl-row").style.opacity = settings.timeLimitOn ? 1 : .4;
+    $("s-vol").value = settings.volume; $("vol-val").textContent = Math.round(settings.volume * 100);
+    $("s-sound").checked = settings.sound; $("s-breath").checked = settings.breath;
+    $("s-voice").checked = settings.voice; $("s-debug").checked = settings.debug;
+    $("s-auto").checked = settings.autoCounts;
+    $("s-bones").value = settings.bonesCustom; $("bn-val").textContent = settings.bonesCustom;
+    $("s-mines").value = settings.minesCustom; $("mn-val").textContent = settings.minesCustom;
+    $("custom-row").style.display = settings.autoCounts ? "none" : "";
+    $("s-bitemode").value = settings.biteMode; $("s-color").value = settings.colorMode;
+    $("s-hp").value = settings.hp; $("hp-val").textContent = settings.hp;
+    $("s-endmode").value = settings.endMode; $("s-bonekeep").value = settings.boneKeep;
+    refreshOutRows();
+    $("settings-overlay").classList.add("on");
+}
+function closeSettings() {
+    $("settings-overlay").classList.remove("on");
+    updateSummary();
+    if (!settings.timeLimitOn) stopTurnTimer();
+    else if (gameStarted && !isGameOver && !globalInteractionLock && !turnTimerId && bonesToTake > 0) startTurnTimer();
+}
+(function bindSettings() {
+    const on = (id, ev, fn) => $(id).addEventListener(ev, fn);
+    on("s-tl", "change", e => { settings.timeLimitOn = e.target.checked; $("tl-row").style.opacity = settings.timeLimitOn ? 1 : .4; saveSettings(); });
+    on("s-tlsec", "input", e => { settings.timeLimitSec = parseInt(e.target.value); $("tl-val").textContent = settings.timeLimitSec; saveSettings(); });
+    on("s-vol", "input", e => { settings.volume = parseFloat(e.target.value); $("vol-val").textContent = Math.round(settings.volume * 100); applyVolumes(); saveSettings(); });
+    on("s-sound", "change", e => { settings.sound = e.target.checked; applyVolumes(); saveSettings(); updateMuteBtn(); });
+    on("s-breath", "change", e => { settings.breath = e.target.checked; applyVolumes(); saveSettings(); });
+    on("s-voice", "change", e => { settings.voice = e.target.checked; saveSettings(); updateMuteBtn(); });
+    on("s-debug", "change", e => { settings.debug = e.target.checked; saveSettings(); updateDebug(); });
+    on("s-auto", "change", e => { settings.autoCounts = e.target.checked; $("custom-row").style.display = settings.autoCounts ? "none" : ""; saveSettings(); });
+    on("s-bones", "input", e => { settings.bonesCustom = parseInt(e.target.value); $("bn-val").textContent = settings.bonesCustom; saveSettings(); });
+    on("s-mines", "input", e => { settings.minesCustom = parseInt(e.target.value); $("mn-val").textContent = settings.minesCustom; saveSettings(); });
+    on("s-bitemode", "change", e => { settings.biteMode = e.target.value; refreshOutRows(); saveSettings(); });
+    on("s-endmode", "change", e => { settings.endMode = e.target.value; saveSettings(); });
+    on("s-bonekeep", "change", e => { settings.boneKeep = e.target.value; saveSettings(); });
+    on("s-hp", "input", e => { settings.hp = parseInt(e.target.value); $("hp-val").textContent = settings.hp; saveSettings(); });
+    on("s-color", "change", e => { settings.colorMode = e.target.value; saveSettings(); });
+})();
+function refreshOutRows() {
+    const o = settings.biteMode === "out" ? 1 : .4;
+    $("hp-row").style.opacity = o; $("out-extra").style.opacity = o;
+}
+function toggleMute() {
+    const anyOn = settings.sound || settings.voice;
+    settings.sound = !anyOn; settings.voice = !anyOn;
+    saveSettings(); updateMuteBtn(); ensureAudio(); applyVolumes();
+    if (anyOn) { try { speechSynthesis.cancel(); } catch (e) {} }
+}
+function updateMuteBtn() { $("mute-btn").textContent = (settings.sound || settings.voice) ? "🔊" : "🔇"; }
+updateMuteBtn();
+function testSound() { ensureAudio(); const t = actx.currentTime; snoreSound(t, 4.0); }
+
+/* ================= 音效引擎（全部即時合成） ================= */
+let actx = null, master = null, sfxBus = null, breathBus = null;
+function ensureAudio() {
+    try {
+        if (!actx) {
+            actx = new (window.AudioContext || window.webkitAudioContext)();
+            const comp = actx.createDynamicsCompressor();
+            comp.threshold.value = -10; comp.ratio.value = 5; comp.attack.value = 0.003; comp.release.value = 0.2;
+            master = actx.createGain(); master.connect(comp); comp.connect(actx.destination);
+            sfxBus = actx.createGain(); sfxBus.connect(master);
+            breathBus = actx.createGain(); breathBus.connect(master);
+        }
+        if (actx.state === "suspended") actx.resume();
+        applyVolumes();
+    } catch (e) {}
+}
+function applyVolumes() {
+    if (!actx) return;
+    master.gain.value = settings.volume * 1.2;
+    sfxBus.gain.value = settings.sound ? 1 : 0;
+    breathBus.gain.value = (settings.sound && settings.breath) ? 1 : 0;
+}
+function distCurve(k) {
+    const n = 1024, c = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const x = i * 2 / n - 1; c[i] = (1 + k) * x / (1 + k * Math.abs(x)); }
+    return c;
+}
+function envelope(g, t, dur, vol, attack, shape) {
+    g.gain.setValueAtTime(0.0001, t);
+    if (shape === "swell") {
+        g.gain.linearRampToValueAtTime(vol, t + dur * 0.55);
+        g.gain.linearRampToValueAtTime(0.0001, t + dur);
+    } else {
+        g.gain.exponentialRampToValueAtTime(Math.max(vol, 0.0002), t + attack);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    }
+}
+function chain(src, t, dur, o) {
+    // src -> [filter] -> [dist] -> env -> [am] -> dest
+    let node = src;
+    if (o.ftype) {
+        const f = actx.createBiquadFilter(); f.type = o.ftype; f.Q.value = o.fq || 1;
+        f.frequency.setValueAtTime(o.ff || o.f1 || 1000, t);
+        if (o.ff2) f.frequency.exponentialRampToValueAtTime(o.ff2, t + dur);
+        node.connect(f); node = f;
+    }
+    if (o.dist) { const ws = actx.createWaveShaper(); ws.curve = distCurve(o.dist); node.connect(ws); node = ws; }
+    const g = actx.createGain(); envelope(g, t, dur, o.vol ?? .3, o.attack ?? .01, o.shape); node.connect(g); node = g;
+    if (o.am) {
+        const trem = actx.createGain(); trem.gain.value = 1 - o.am.depth;
+        const lfo = actx.createOscillator(); lfo.frequency.value = o.am.rate;
+        const lg = actx.createGain(); lg.gain.value = o.am.depth;
+        lfo.connect(lg); lg.connect(trem.gain); lfo.start(t); lfo.stop(t + dur + .05);
+        node.connect(trem); node = trem;
+    }
+    node.connect(o.dest || sfxBus);
+}
+function os(t, dur, o = {}) {
+    if (!actx) return;
+    const s = actx.createOscillator(); s.type = o.type || "sine";
+    s.frequency.setValueAtTime(o.f1 || 440, t);
+    if (o.f2) s.frequency.exponentialRampToValueAtTime(o.f2, t + dur);
+    chain(s, t, dur, o); s.start(t); s.stop(t + dur + .05);
+}
+function nz(t, dur, o = {}) {
+    if (!actx) return;
+    const len = Math.max(1, Math.floor(actx.sampleRate * (dur + .05)));
+    const buf = actx.createBuffer(1, len, actx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const s = actx.createBufferSource(); s.buffer = buf;
+    const oo = Object.assign({ ftype: "bandpass", ff: o.f1 || 800, ff2: o.f2, fq: o.q || 1 }, o);
+    chain(s, t, dur, oo); s.start(t); s.stop(t + dur + .05);
+}
+const now = () => actx ? actx.currentTime + 0.02 : 0;
+
+/* --- 呼吸 / 打呼 --- */
+function snoreSound(t, D) {
+    const di = D * 0.45, de = D * 0.4, B = breathBus;
+    // 吸氣：喉嚨震動的打呼聲
+    os(t, di, { type: "sawtooth", f1: 58, f2: 74, vol: .55, ftype: "lowpass", ff: 420, fq: 5, am: { rate: 27, depth: .85 }, shape: "swell", dest: B });
+    os(t, di, { type: "square", f1: 116, f2: 140, vol: .12, ftype: "lowpass", ff: 600, am: { rate: 27, depth: .9 }, shape: "swell", dest: B });
+    nz(t, di, { vol: .16, f1: 450, f2: 700, q: 1.5, shape: "swell", dest: B });
+    // 吐氣：呼～ + 嘴唇噗噗
+    nz(t + D * .5, de, { vol: .24, f1: 1200, f2: 420, q: 1.1, shape: "swell", dest: B });
+    os(t + D * .5 + de * .55, de * .45, { type: "sine", f1: 96, f2: 78, vol: .3, am: { rate: 15, depth: 1 }, dest: B });
+}
+function huffSound(t, D) {
+    const B = breathBus;
+    nz(t, D * .35, { vol: .3, f1: 1600, f2: 2600, q: 2, shape: "swell", dest: B });
+    nz(t + D * .45, D * .4, { vol: .35, f1: 1000, f2: 380, q: 1, shape: "swell", dest: B });
+    os(t, D * .9, { type: "sawtooth", f1: 62, f2: 56, vol: .22, ftype: "lowpass", ff: 320, fq: 3, am: { rate: 33, depth: .75 }, shape: "swell", dest: B });
+}
+
+/* --- 一般音效 --- */
+const SFX = {
+    tick()   { const t = now(); os(t, .05, { type: "square", f1: 1050, vol: .12 }); },
+    clock()  { const t = now(); os(t, .04, { type: "triangle", f1: 950, vol: .07 }); },
+    pick()   { const t = now(); os(t, .09, { f1: 500, f2: 900, vol: .2 }); },
+    drop()   { const t = now(); os(t, .12, { type: "triangle", f1: 660, vol: .25 }); os(t + .1, .25, { type: "triangle", f1: 990, vol: .25 }); },
+    bounce() { const t = now(); os(t, .25, { type: "triangle", f1: 300, f2: 140, vol: .25 }); },
+    turn()   { const t = now(); [523, 659, 784].forEach((f, i) => os(t + i * .1, .18, { type: "triangle", f1: f, vol: .18 })); },
+    done()   { const t = now(); [784, 988, 1175, 1568].forEach((f, i) => os(t + i * .08, .25, { type: "triangle", f1: f, vol: .2 })); },
+    meow()   { const t = now(); os(t, .25, { type: "triangle", f1: 600, f2: 1000, vol: .2 }); os(t + .25, .45, { type: "triangle", f1: 1000, f2: 520, vol: .2 }); },
+    win()    {
+        const t = now(); const m = [523, 523, 523, 659, 784, 659, 784, 1047], tm = [0, .14, .28, .42, .62, .82, .96, 1.16];
+        m.forEach((f, i) => { os(t + tm[i], i === 7 ? .9 : .2, { type: "square", f1: f, vol: .14 }); os(t + tm[i], .2, { type: "triangle", f1: f / 2, vol: .14 }); });
+    },
+    // 假動作
+    slurp()  { const t = now(); nz(t, .55, { vol: .4, f1: 300, f2: 1700, q: 8 }); os(t, .55, { f1: 300, f2: 760, vol: .18, am: { rate: 12, depth: .6 } }); os(t + 1.0, .14, { f1: 1500, f2: 480, vol: .35 }); },
+    smack()  { const t = now(); for (let i = 0; i < 3; i++) { nz(t + i * .2, .04, { vol: .6, ftype: "highpass", f1: 2600 }); os(t + i * .2, .06, { f1: 260, f2: 140, vol: .45 }); } nz(t + .1, .5, { vol: .15, f1: 600, f2: 1400, q: 6 }); },
+    roll()   { const t = now(); nz(t, 1.0, { vol: .3, ftype: "lowpass", f1: 900, f2: 450, am: { rate: 9, depth: .7 } }); os(t + .25, .5, { type: "sawtooth", f1: 125, f2: 82, vol: .5, ftype: "bandpass", ff: 520, fq: 2 }); nz(t + .9, 1.0, { vol: .22, f1: 750, f2: 280, shape: "swell" }); },
+    peek()   { const t = now(); os(t, 1.3, { type: "sawtooth", f1: 58, f2: 68, vol: .7, ftype: "lowpass", ff: 450, fq: 4, am: { rate: 36, depth: .85 }, dist: 15, shape: "swell" }); },
+    snort()  { const t = now(); nz(t, .32, { vol: .75, ftype: "lowpass", f1: 650, f2: 280, am: { rate: 42, depth: .9 } }); os(t, .32, { type: "sawtooth", f1: 96, f2: 70, vol: .45, ftype: "lowpass", ff: 320 }); },
+    ear()    { const t = now(); nz(t, .05, { vol: .45, f1: 1800, q: 2 }); nz(t + .1, .05, { vol: .45, f1: 1500, q: 2 }); },
+    whimper(){ const t = now(); os(t, .45, { type: "triangle", f1: 620, f2: 940, vol: .22 }); os(t + .45, .55, { type: "triangle", f1: 940, f2: 560, vol: .22, am: { rate: 7, depth: .4 } }); },
+    // 真的咬人
+    bite() {
+        const t = now();
+        // 低吼蓄力
+        os(t, .7, { type: "sawtooth", f1: 52, f2: 95, vol: .9, ftype: "lowpass", ff: 600, fq: 3, am: { rate: 40, depth: .8 }, dist: 40, shape: "swell" });
+        const bark = (tt, len, p, v) => {
+            os(tt, len, { type: "sawtooth", f1: 460 * p, f2: 150 * p, vol: v, ftype: "bandpass", ff: 950, fq: 1.1, dist: 80, attack: .004 });
+            os(tt, len, { type: "square", f1: 230 * p, f2: 85 * p, vol: v * .7, ftype: "lowpass", ff: 1500, dist: 50, attack: .004 });
+            nz(tt, .09, { vol: v * .8, ftype: "highpass", f1: 1400 });
+            os(tt, len + .2, { f1: 120, f2: 40, vol: v });
+        };
+        bark(t + .62, .22, 1, 1);
+        bark(t + .92, .22, 1.05, 1);
+        bark(t + 1.22, .6, .82, 1.1);
+        // 咬合 + 低頻轟
+        nz(t + 1.22, .06, { vol: 1, ftype: "highpass", f1: 3200 });
+        os(t + 1.22, .08, { type: "square", f1: 190, f2: 90, vol: .7 });
+        os(t + 1.22, 1.4, { f1: 75, f2: 26, vol: 1.2 });
+        nz(t + 1.25, 1.0, { vol: .5, ftype: "lowpass", f1: 300, f2: 80 });
+        // 收尾低吼
+        os(t + 1.9, 1.1, { type: "sawtooth", f1: 70, f2: 50, vol: .6, ftype: "lowpass", ff: 380, fq: 3, am: { rate: 34, depth: .8 }, dist: 20, shape: "swell" });
+    },
+    yawn() {
+        const t = now();
+        nz(t, .8, { vol: .28, f1: 500, f2: 1500, q: 1.2, shape: "swell" });                                   // 深吸一口氣
+        os(t + .7, 1.9, { type: "sawtooth", f1: 230, f2: 140, vol: .4, ftype: "bandpass", ff: 950, ff2: 360, fq: 3, shape: "swell" }); // 啊～嗚～
+        os(t + .7, 1.9, { type: "sawtooth", f1: 115, f2: 70, vol: .25, ftype: "lowpass", ff: 520, shape: "swell" });
+        nz(t + .7, 1.9, { vol: .2, f1: 1300, f2: 450, q: 1, shape: "swell" });
+        os(t + 2.75, .09, { type: "square", f1: 160, f2: 80, vol: .4 });                                    // 嘴巴闔上「喀」
+        nz(t + 2.75, .04, { vol: .45, ftype: "highpass", f1: 2200 });
+    },
+    chew() {   // 咬嘴巴、嚼嚼
+        const t = now();
+        for (let i = 0; i < 4; i++) {
+            os(t + i * .22, .07, { type: "square", f1: 140, f2: 90, vol: .3 });
+            nz(t + i * .22 + .02, .05, { vol: .3, ftype: "highpass", f1: 2400 });
+            nz(t + i * .22 + .05, .12, { vol: .15, f1: 700, f2: 1500, q: 6 });
+        }
+    },
+    grind() {  // 磨牙：嘎吱嘎吱
+        const t = now();
+        nz(t, 1.7, { vol: .45, f1: 3200, f2: 2600, q: 4, am: { rate: 11, depth: .9 } });
+        nz(t, 1.7, { vol: .22, ftype: "lowpass", f1: 520, f2: 480, am: { rate: 11, depth: .8 } });
+        for (let i = 0; i < 16; i++) nz(t + i * .105 + Math.random() * .03, .025, { vol: .32, ftype: "highpass", f1: 4200 });
+    },
+    grumble() { const t = now(); os(t, .9, { type: "sawtooth", f1: 90, f2: 60, vol: .35, ftype: "lowpass", ff: 400, am: { rate: 20, depth: .6 }, shape: "swell" }); }
+};
+
+/* ================= 語音 ================= */
+let zhVoice = null;
+function pickVoice() { try { const vs = speechSynthesis.getVoices(); zhVoice = vs.find(v => /zh[-_]TW/i.test(v.lang)) || vs.find(v => /^zh/i.test(v.lang)) || null; } catch (e) {} }
+if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+function speak(text, cancel = true) {
+    if (!settings.voice || !("speechSynthesis" in window)) return;
+    try {
+        if (cancel) speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text); u.lang = "zh-TW"; if (zhVoice) u.voice = zhVoice;
+        u.rate = 1.0; u.pitch = 1.1; u.volume = Math.min(1, settings.volume + .15);
+        speechSynthesis.speak(u);
+    } catch (e) {}
+}
+const CN_NUM = ["零", "一", "兩", "三"];
+
+/* ================= 工具 ================= */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const rnd = (a, b) => a + Math.random() * (b - a);
+function anim(id, frames, opts) { const el = typeof id === "string" ? $(id) : id; return el.animate(frames, opts); }
+const BONE_COLORS = { red: ["#ff4040", "#b82020"], yellow: ["#ffd93b", "#c9a400"], blue: ["#3d8bff", "#1f5bbf"], white: ["#fafafa", "#a8a8a8"] };
+function boneSVG(color) {
+    const [c, s] = BONE_COLORS[color];
+    return `<svg viewBox="0 0 100 40"><g fill="${c}" stroke="${s}" stroke-width="3">
+        <circle cx="13" cy="12" r="10.5"/><circle cx="13" cy="28" r="10.5"/><circle cx="87" cy="12" r="10.5"/><circle cx="87" cy="28" r="10.5"/>
+        <rect x="13" y="12" width="74" height="16" rx="3"/></g>
+        <rect x="11" y="13.5" width="78" height="13" fill="${c}"/>
+        <rect x="20" y="15" width="56" height="3.5" rx="2" fill="#fff" opacity=".45"/></svg>`;
+}
+
+/* ================= 遊戲狀態（觸發機制與五版完全相同） ================= */
+let players = [], currentPlayerIdx = 0, bonesToTake = 0, bonesTakenThisTurn = 0;
+let totalBonesCount = 28, minesTarget = 1, rageLevel = 0;
+let gameBiteMode = "out", gameEndMode = "survive", gameBoneKeep = "return";   // 開局時鎖定，遊戲中改設定不影響這一局
+let need = [], got = [];   // 本回合指令：每一格要的顏色（null = 不限）與是否已拿到
+let isGameOver = false, globalInteractionLock = false, gameStarted = false;
+let currentTargetBone = null, isDragActive = false, dragTimer = null;
+let lastFake = 0;
+
+function generatePlayerInputs() {
+    const count = parseInt($("player-count").value);
+    const c = $("player-names-container"); c.innerHTML = "";
+    for (let i = 1; i <= count; i++) c.innerHTML += `<input type="text" id="p-name-${i}" value="玩家 ${i}" maxlength="8">`;
+}
+generatePlayerInputs();
+
+/* ================= 暗雷：建議數量 ================= */
+// 依人數建議：每次被咬之間大約 1～2 輪，整局不會拖太久
+function recommended(n) {
+    if (n === 2) return { bones: 16, mines: 1 };
+    if (n <= 4) return { bones: 28, mines: 1 };
+    if (n <= 6) return { bones: 28, mines: 2 };
+    if (n <= 8) return { bones: 35, mines: 2 };
+    return { bones: 35, mines: 3 };
+}
+function gameCounts(n) {
+    const r = recommended(n);
+    const bones = settings.autoCounts ? r.bones : settings.bonesCustom;
+    const mines = Math.min(settings.autoCounts ? r.mines : settings.minesCustom, bones - 1);
+    return { bones, mines };
+}
+const COLOR_NAME = { red: "紅色", yellow: "黃色", blue: "藍色", white: "白色" };
+function updateSummary() {
+    const n = parseInt($("player-count").value), c = gameCounts(n);
+    const mode = settings.biteMode === "out" ? (settings.hp > 1 ? `❤️ 每人 ${settings.hp} 滴血，扣光出局` : "被咬出局") : "被咬不出局（骨頭倒回）";
+    const col = { off: "不指定顏色", single: "指定一種顏色", mix: "可混色" }[settings.colorMode];
+    const extra = settings.biteMode === "out"
+        ? `<br>${settings.endMode === "score" ? "🏁 計分模式：有人被咬死就結算排名" : "🏁 存活模式：剩最後一人獲勝"}・${settings.boneKeep === "keep" ? "被咬骨頭留在籃子" : "被咬骨頭倒回盤子"}` : "";
+    $("setup-summary").innerHTML = `🦴 骨頭 <b>${c.bones}</b> 根、💣 暗雷 <b>${c.mines}</b> 根<br>${mode}・${col}${extra}<br><span style="font-size:13px;color:#999">（可在右上角 ⚙️ 調整）</span>`;
+}
+$("player-count").addEventListener("change", updateSummary);
+updateSummary();
+function fieldBones() { return [...$("bone-field").querySelectorAll(".bone")]; }
+function fieldCount() { return fieldBones().length; }
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function replenishMines() {
+    const bones = fieldBones();
+    let mines = bones.filter(b => b.dataset.mine === "1").length;
+    const safe = shuffle(bones.filter(b => b.dataset.mine !== "1"));
+    while (mines < minesTarget && safe.length) { safe.pop().dataset.mine = "1"; mines++; }
+    updateDebug();
+}
+
+function startGame() {
+    ensureAudio();
+    const count = parseInt($("player-count").value);
+    gameBiteMode = settings.biteMode;
+    gameEndMode = settings.endMode; gameBoneKeep = settings.boneKeep;
+    const gc = gameCounts(count);
+    totalBonesCount = gc.bones; minesTarget = gc.mines;
+    players = [];
+    for (let i = 1; i <= count; i++) {
+        const name = $(`p-name-${i}`).value.trim() || `玩家 ${i}`;
+        players.push({ id: i, name, score: 0, eliminated: false, hp: gameBiteMode === "out" ? settings.hp : 1, maxHp: gameBiteMode === "out" ? settings.hp : 1 });
+    }
+    rageLevel = 0;
+    currentPlayerIdx = 0; isGameOver = false; globalInteractionLock = false; gameStarted = true;
+    $("setup-panel").style.display = "none";
+    $("game").classList.add("on");
+    buildBaskets();
+    requestAnimationFrame(() => { scatterBones(); replenishMines(); startBreathing(); scheduleIdle(); setTimeout(startTurn, 900); });
+}
+
+function updateDebug() {
+    const b = $("debug-box");
+    b.classList.toggle("on", settings.debug);
+    document.body.classList.toggle("debug-on", settings.debug);
+    if (!settings.debug) return;
+    const mines = fieldBones().filter(x => x.dataset.mine === "1").length;
+    b.innerHTML = `盤上骨頭：${fieldCount()} 根<br>暗雷：${mines} 根（紅色虛線框）<br>模式：${gameBiteMode === "out" ? "出局＋補新暗雷" : "不出局、暗雷用完為止"}<br>血量：${players.map(p => p.name + " " + p.hp).join("、")}`;
+}
+
+function heartsHTML(p) {
+    if (p.maxHp <= 1) return "";
+    let h = "";
+    for (let i = 0; i < p.maxHp; i++) h += `<span class="${i < p.hp ? "" : "lost"}">❤️</span>`;
+    return h;
+}
+function buildBaskets() {
+    const area = $("player-area");
+    area.innerHTML = "";
+    area.style.gridTemplateColumns = `repeat(${players.length}, minmax(0, 1fr))`;
+    players.forEach((p, idx) => {
+        area.innerHTML += `<div class="basket" id="basket-${idx}" data-idx="${idx}">
+            <div class="basket-title">${p.name}</div>
+            <div class="hearts" id="hearts-${idx}">${heartsHTML(p)}</div>
+            <div class="basket-score">🦴 <span id="score-lbl-${idx}">0</span></div>
+            <div class="basket-inventory" id="basket-inv-${idx}"></div>
+            <div class="now">輪到你！</div>
+        </div>`;
+    });
+}
+
+// 骨頭平均鋪滿整個盆子寬度：每位玩家正上方都有骨頭，拖曳距離一樣
+function scatterBones() {
+    const field = $("bone-field");
+    field.innerHTML = "";
+    const colors = ["red", "yellow", "blue", "white"];
+    const rows = totalBonesCount <= 16 ? 2 : 3;
+    const cols = Math.ceil(totalBonesCount / rows);
+    const fw = field.clientWidth, fh = field.clientHeight;
+    const bw = Math.max(60, Math.min(120, fw / (cols + .5) * .72, fh / rows * 1.6));
+    field.style.setProperty("--bw", bw + "px");
+    let i = 0;
+    for (let r = 0; r < rows; r++) {
+        const inRow = Math.min(cols, totalBonesCount - i);
+        for (let c = 0; c < inRow; c++, i++) {
+            const off = (r % 2) ? .5 : 0;
+            const x = ((c + .5 + off * (inRow < cols ? 1 : .5)) / (cols + .5)) * 100 + rnd(-1.2, 1.2);
+            const y = ((r + .5) / rows) * 100 + rnd(-6, 6);
+            field.appendChild(makeBone(colors[i % 4], x, y));
+        }
+    }
+}
+
+function makeBone(color, x, y) {
+    const bone = document.createElement("div");
+    bone.className = "bone";
+    bone.dataset.color = color;
+    bone.innerHTML = boneSVG(color);
+    bone.dataset.x = x; bone.dataset.y = y;
+    bone.style.left = x + "%"; bone.style.top = y + "%";
+    bone.style.setProperty("--r", rnd(-35, 35).toFixed(0) + "deg");
+    bone.addEventListener("pointerdown", e => onBoneGrabStart(e, bone));
+    return bone;
+}
+
+/* ================= 指令產生（只出盤子裡真的有的顏色與數量） ================= */
+function makeRequirement(c) {
+    const bones = fieldBones();
+    c = Math.max(1, Math.min(c, bones.length));
+    if (settings.colorMode === "off") return Array(c).fill(null);
+    const counts = {};
+    bones.forEach(b => counts[b.dataset.color] = (counts[b.dataset.color] || 0) + 1);
+    if (settings.colorMode === "single") {
+        let opts = Object.keys(counts).filter(k => counts[k] >= c);
+        while (!opts.length) { c--; opts = Object.keys(counts).filter(k => counts[k] >= c); }
+        const pool = []; opts.forEach(k => { for (let i = 0; i < counts[k]; i++) pool.push(k); });
+        return Array(c).fill(pool[Math.floor(Math.random() * pool.length)]);
+    }
+    // 混色：從盤子裡實際的骨頭隨機挑 c 根，用它們的顏色當指令 → 一定拿得到
+    return shuffle(bones.slice()).slice(0, c).map(b => b.dataset.color).sort();
+}
+function requirementText() {
+    if (!need[0]) return { html: `要拿 <b>${need.length}</b> 根`, voice: `拿${CN_NUM[need.length]}根骨頭` };
+    const g = {}; need.forEach(c => g[c] = (g[c] || 0) + 1);
+    const ks = Object.keys(g);
+    const html = `要拿 <b>${need.length}</b> 根<br>` + ks.map(k => `<span class="cc ${k}">${COLOR_NAME[k]} × ${g[k]}</span>`).join(" ");
+    const voice = "拿" + ks.map(k => `${CN_NUM[g[k]]}根${COLOR_NAME[k]}`).join("、") + "的骨頭";
+    return { html, voice };
+}
+
+/* ================= 回合 ================= */
+function startTurn() {
+    if (isGameOver) return;
+    const survivors = players.filter(p => !p.eliminated);
+    if (survivors.length === 1) return endGame(players.indexOf(survivors[0]), "survivor-win");
+    if (survivors.length === 0) return endGame(-1, "all-dead");
+    if (fieldCount() <= 0) return checkScoreWinner();
+
+    bonesTakenThisTurn = 0;
+    globalInteractionLock = false;
+    const p = players[currentPlayerIdx];
+    document.querySelectorAll(".basket").forEach((b, idx) => b.classList.toggle("active", idx === currentPlayerIdx && !players[idx].eliminated));
+    $("hud-name").textContent = p.name;
+    const hud = $("hud"); hud.classList.remove("pop"); void hud.offsetWidth; hud.classList.add("pop");
+    SFX.turn();
+
+    // 原本的「抽牌」改成自動隨機（已取消貓咪免抽）
+    const r = Math.random();
+    const want = r < 0.44 ? 1 : (r < 0.80 ? 2 : 3);  // 每人都要拿：1根44%、2根36%、3根20%
+    need = makeRequirement(want);
+    got = need.map(() => false);
+    bonesToTake = need.length;
+    const rt = requirementText();
+    $("hud-take").innerHTML = rt.html;
+    renderSlots();
+    setMsg("把骨頭拖到你的籃子 ⬇");
+    speak(`輪到${p.name}，${rt.voice}`);
+    startTurnTimer();
+}
+function renderSlots() {
+    let h = "";
+    for (let i = 0; i < need.length; i++) h += `<div class="slot ${got[i] ? "got" : ""}">${boneSVG(need[i] || "white")}</div>`;
+    $("hud-bones").innerHTML = h;
+}
+function setMsg(t) { $("hud-msg").textContent = t; }
+
+function nextTurn() {
+    if (isGameOver) return;
+    let n = 0;
+    do { currentPlayerIdx = (currentPlayerIdx + 1) % players.length; n++; }
+    while (players[currentPlayerIdx].eliminated && n <= players.length);
+    startTurn();
+}
+
+/* ================= 限時（設定開啟才有） ================= */
+let turnTimerId = null, turnLeft = 0;
+function stopTurnTimer() { if (turnTimerId) clearInterval(turnTimerId); turnTimerId = null; $("hud-timer").classList.remove("on", "hurry"); }
+function startTurnTimer() {
+    stopTurnTimer();
+    if (!settings.timeLimitOn || isGameOver) return;
+    turnLeft = settings.timeLimitSec;
+    $("hud-timer").classList.add("on");
+    renderTurnTimer();
+    turnTimerId = setInterval(() => {
+        if ($("settings-overlay").classList.contains("on") || globalInteractionLock) return;
+        const before = Math.ceil(turnLeft);
+        turnLeft -= .25;
+        renderTurnTimer();
+        if (Math.ceil(turnLeft) < before && turnLeft <= 5 && turnLeft > 0) SFX.tick();
+        if (turnLeft <= 3 && !isDragActive) setAgitated(true);
+        if (turnLeft <= 0) { stopTurnTimer(); triggerBite("timeout"); }
+    }, 250);
+}
+function renderTurnTimer() {
+    $("timer-num").textContent = `${Math.max(0, Math.ceil(turnLeft))} 秒`;
+    $("timer-ring").style.strokeDashoffset = (100.5 * (1 - Math.max(0, turnLeft) / settings.timeLimitSec)).toFixed(1);
+    $("hud-timer").classList.toggle("hurry", turnLeft <= 5);
+}
+
+/* ================= 拖曳骨頭 ================= */
+function onBoneGrabStart(e, bone) {
+    if (isGameOver || bonesToTake === 0 || bonesTakenThisTurn >= bonesToTake || globalInteractionLock) return;
+    if (isDragActive) return;
+    e.preventDefault();
+    ensureAudio();
+    // 💣 暗雷：一碰到就咬（像海盜桶插到機關）
+    if (bone.dataset.mine === "1") { triggerBite("mine", bone); return; }
+    currentTargetBone = bone;
+    isDragActive = true;
+
+    SFX.pick();
+    setAgitated(true);
+    const rect = bone.getBoundingClientRect();
+    bone.style.width = $("bone-field").style.getPropertyValue("--bw");
+    document.body.appendChild(bone);
+    bone.classList.add("dragging");
+    moveBone(e);
+    if (Math.random() < 0.3) fakeAction();
+
+    // 拖曳中狗會隨機做假動作（只是嚇人，不會咬）
+    dragTimer = setInterval(() => {
+        if (Math.random() < Math.min(0.12, 0.06 + rageLevel * 0.02)) fakeAction();
+    }, 100);
+
+    window.addEventListener("pointermove", onBoneDrag);
+    window.addEventListener("pointerup", onBoneDrop);
+    window.addEventListener("pointercancel", onBoneDrop);
+}
+function onBoneDrag(e) { if (!isDragActive) return; moveBone(e); checkBasketHover(e); }
+function moveBone(e) { currentTargetBone.style.left = e.clientX + "px"; currentTargetBone.style.top = e.clientY + "px"; }
+function checkBasketHover(e) {
+    document.querySelectorAll(".basket").forEach(b => {
+        b.classList.remove("hovered");
+        if (b.classList.contains("eliminated")) return;
+        const r = b.getBoundingClientRect();
+        if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) b.classList.add("hovered");
+    });
+}
+function removeDragListeners() {
+    window.removeEventListener("pointermove", onBoneDrag);
+    window.removeEventListener("pointerup", onBoneDrop);
+    window.removeEventListener("pointercancel", onBoneDrop);
+}
+function returnBoneToField(bone) {
+    bone.classList.remove("dragging");
+    bone.style.width = "";
+    bone.style.left = bone.dataset.x + "%"; bone.style.top = bone.dataset.y + "%";
+    $("bone-field").appendChild(bone);
+}
+function onBoneDrop() {
+    if (!isDragActive) return;
+    isDragActive = false;
+    clearInterval(dragTimer);
+    removeDragListeners();
+    const hovered = document.querySelector(".basket.hovered");
+    document.querySelectorAll(".basket").forEach(b => b.classList.remove("hovered"));
+    if (!(turnLeft <= 3 && settings.timeLimitOn)) setAgitated(false);
+
+    const slot = (hovered && parseInt(hovered.dataset.idx) === currentPlayerIdx)
+        ? need.findIndex((c, i) => !got[i] && (c === null || c === currentTargetBone.dataset.color)) : -2;
+    if (slot === -1) {
+        SFX.bounce();
+        returnBoneToField(currentTargetBone); currentTargetBone = null;
+        const left = [...new Set(need.filter((c, i) => !got[i]))].map(c => COLOR_NAME[c]).join("或");
+        setMsg(`顏色不對！要拿${left}的喔`);
+        speak(`顏色不對，要拿${left}`);
+        return;
+    }
+    if (slot >= 0) {
+        got[slot] = true;
+        SFX.drop();
+        const p = players[currentPlayerIdx];
+        p.score++;
+        $(`score-lbl-${currentPlayerIdx}`).textContent = p.score;
+        const mini = document.createElement("div");
+        mini.className = "mini-bone"; mini.dataset.color = currentTargetBone.dataset.color; mini.innerHTML = boneSVG(currentTargetBone.dataset.color);
+        $(`basket-inv-${currentPlayerIdx}`).appendChild(mini);
+        currentTargetBone.remove(); currentTargetBone = null;
+        bonesTakenThisTurn++;
+        renderSlots(); updateDebug();
+
+        if (fieldCount() <= 0) {
+            globalInteractionLock = true; stopTurnTimer();
+            setMsg("最後一根骨頭被拿走了！結算中…");
+            setTimeout(checkScoreWinner, 600);
+            return;
+        }
+        if (bonesTakenThisTurn >= bonesToTake) {
+            globalInteractionLock = true; stopTurnTimer(); setAgitated(false);
+            SFX.done(); setMsg("完成！換下一位…");
+            setTimeout(nextTurn, 1300);
+        } else {
+            setMsg(`成功！還差 ${bonesToTake - bonesTakenThisTurn} 根`);
+        }
+    } else {
+        SFX.bounce();
+        returnBoneToField(currentTargetBone); currentTargetBone = null;
+        setMsg("要放進「你自己的」籃子喔！");
+    }
+}
+
+/* ================= 狗：呼吸循環（動畫與聲音同步） ================= */
+let breathing = false, agitated = false, breathTimeout = null, breathAnims = [];
+function startBreathing() { if (breathing) return; breathing = true; breathCycle(); }
+function stopBreathing() { breathing = false; clearTimeout(breathTimeout); breathAnims.forEach(a => a.cancel()); breathAnims = []; }
+function setAgitated(v) {
+    if (agitated === v) return;
+    agitated = v;
+    if (breathing) { clearTimeout(breathTimeout); breathCycle(); }
+}
+function breathCycle() {
+    if (!breathing) return;
+    const D = agitated ? 1400 : 4000;
+    const A = agitated ? 7 : 12, S = agitated ? .03 : .05;
+    breathAnims.forEach(a => a.cancel());
+    const ease = { duration: D, easing: "ease-in-out" };
+    breathAnims = [
+        anim("dog-breath", [
+            { transform: "translate(0,0) scale(1,1)" },
+            { transform: `translate(0,${-A}px) scale(${1 + S * .6},${1 + S})`, offset: .45 },
+            { transform: "translate(0,0) scale(1,1)", offset: .92 },
+            { transform: "translate(0,0) scale(1,1)" }], ease),
+        anim("dog-body", [
+            { transform: "scale(1,1)" }, { transform: `scale(${1 + S},${1 + S * 1.8})`, offset: .45 },
+            { transform: "scale(1,1)", offset: .92 }, { transform: "scale(1,1)" }], ease),
+        anim("nose", [
+            { transform: "scale(1)" }, { transform: "scale(1.1,1.06)", offset: .4 }, { transform: "scale(1)", offset: .6 }, { transform: "scale(1)" }], ease),
+        anim("jowls", [
+            { transform: "scale(1,1)" }, { transform: "scale(1,1)", offset: .5 },
+            { transform: "scale(1.05,1.1)", offset: .66 }, { transform: "scale(1,.97)", offset: .78 }, { transform: "scale(1,1)" }], ease)
+    ];
+    if (actx && actx.state === "running") agitated ? huffSound(now(), D / 1000) : snoreSound(now(), D / 1000);
+    if (!agitated) setTimeout(() => { if (breathing && !agitated) spawnZ(); }, D * .55);
+    breathTimeout = setTimeout(breathCycle, D);
+}
+
+/* 位置換算：狗 SVG 座標 → 舞台座標 */
+function dogPoint(x, y) {
+    const st = $("stage").getBoundingClientRect(), w = $("dog-wrap").getBoundingClientRect();
+    return { x: w.left - st.left + x / 600 * w.width, y: w.top - st.top + y / 400 * w.height, s: w.width / 600 };
+}
+function spawnZ() {
+    const p = dogPoint(445, 95);
+    [0, 350, 700].forEach((d, i) => setTimeout(() => {
+        const z = document.createElement("div");
+        z.className = "zz"; z.textContent = "Z";
+        z.style.left = p.x + "px"; z.style.top = p.y + "px";
+        z.style.fontSize = (22 + i * 10) * p.s * 1.6 + "px";
+        $("stage").appendChild(z);
+        z.animate([{ transform: "translate(0,0) rotate(-10deg)", opacity: 0 }, { opacity: 1, offset: .2 },
+            { transform: `translate(${60 * p.s * 1.6}px,${-90 * p.s * 1.6}px) rotate(15deg)`, opacity: 0 }],
+            { duration: 2200, easing: "ease-out" }).onfinish = () => z.remove();
+    }, d));
+}
+function say(text, x = 300, y = 40, ms = 1400) {
+    const p = dogPoint(x, y);
+    const b = document.createElement("div");
+    b.className = "say"; b.textContent = text;
+    b.style.left = p.x + "px"; b.style.top = p.y + "px";
+    $("stage").appendChild(b);
+    b.animate([{ transform: "translate(-50%,-50%) scale(.3)", opacity: 0 }, { transform: "translate(-50%,-50%) scale(1.1)", opacity: 1, offset: .15 },
+        { transform: "translate(-50%,-50%) scale(1)", opacity: 1, offset: .8 }, { transform: "translate(-50%,-70%) scale(1)", opacity: 0 }],
+        { duration: ms }).onfinish = () => b.remove();
+}
+
+/* ================= 假動作（嚇嚇人，不會咬） ================= */
+let pose = 0;
+const POSES = ["", "translate(-30px,6px) rotate(-9deg)", "translate(30px,6px) rotate(9deg)", "translate(0px,14px) scale(1.02,.96)"];
+const PAW_POSES = ["", "translate(-14px,0)", "translate(14px,0)", "translate(0,4px)"];
+function fakeAction() {
+    const t = performance.now();
+    if (t - lastFake < 1300 || isGameOver) return;
+    lastFake = t;
+    const r = Math.random();
+    if (yawning) return;
+    if (r < .18) fakeDrool();
+    else if (r < .30) fakeLick();
+    else if (r < .46) fakeRoll();
+    else if (r < .60) fakePeek();
+    else if (r < .71) fakeSnort();
+    else if (r < .78) fakeEar();
+    else if (r < .83) fakeWhimper();
+    else if (r < .93) fakeGrind();
+    else fakeYawn();
+}
+function fakeDrool() {
+    SFX.slurp(); say("咕嚕…", 170, 250);
+    anim("drool", [
+        { opacity: 0, transform: "translateY(0) scale(.3,.2)" }, { opacity: 1, transform: "translateY(0) scale(1,1.3)", offset: .35 },
+        { opacity: 1, transform: "translateY(8px) scale(.9,2.2)", offset: .6 }, { opacity: 0, transform: "translateY(130px) scale(.7,1)" }],
+        { duration: 1500, easing: "ease-in" });
+}
+function fakeLick() {
+    SFX.smack(); say("吧唧吧唧", 300, 380);
+    anim("tongue-lick", [
+        { opacity: 1, transform: "translate(0,-28px)" }, { opacity: 1, transform: "translate(-14px,6px) rotate(-12deg)", offset: .3 },
+        { opacity: 1, transform: "translate(14px,6px) rotate(12deg)", offset: .6 }, { opacity: 1, transform: "translate(0,-28px)" }],
+        { duration: 1000 });
+}
+function fakeRoll() {
+    SFX.roll(); say("嗯～哼…", 470, 60, 1600);
+    let n; do { n = Math.floor(Math.random() * POSES.length); } while (n === pose);
+    pose = n;
+    $("dog-pose").style.transform = POSES[n];
+    $("paws-pose").style.transform = PAW_POSES[n];
+    anim("dog-lunge", [{ transform: "scale(1,1)" }, { transform: "scale(1.05,.93)", offset: .3 }, { transform: "scale(.98,1.03)", offset: .6 }, { transform: "scale(1,1)" }], { duration: 900 });
+}
+function fakePeek() {
+    SFX.peek();
+    $("stage").classList.add("dim");
+    $("eyeL-closed").style.display = "none";
+    $("eyeL-open").style.display = "";
+    anim("eyeL-open", [{ transform: "scaleY(0)" }, { transform: "scaleY(.55)", offset: .2 }, { transform: "scaleY(.5)", offset: .8 }, { transform: "scaleY(0)" }], { duration: 1500 })
+        .onfinish = () => {
+            if (!biting) { $("eyeL-open").style.display = "none"; $("eyeL-closed").style.display = ""; }
+            $("stage").classList.remove("dim");
+        };
+}
+function fakeSnort() {
+    SFX.snort(); say("呼嚕！！", 300, 30, 1000);
+    anim("dog-lunge", [{ transform: "translateY(0)" }, { transform: "translateY(-4%) scale(1.03)", offset: .2 }, { transform: "translateY(0)" }], { duration: 500 });
+    spawnZ();
+}
+function fakeEar() {
+    SFX.ear();
+    const side = Math.random() < .5 ? "ear-l" : "ear-r", d = side === "ear-l" ? -1 : 1;
+    anim(side, [{ transform: "rotate(0)" }, { transform: `rotate(${18 * d}deg)` }, { transform: "rotate(0)" }, { transform: `rotate(${14 * d}deg)` }, { transform: "rotate(0)" }], { duration: 600 });
+}
+let yawning = false, idleTimer = null;
+async function fakeYawn() {
+    if (yawning || biting || isGameOver) return;
+    yawning = true; lastFake = performance.now();
+    stopBreathing();
+    SFX.yawn();
+    say("啊～～嗚～～", 470, 40, 2600);
+    const hold = { fill: "forwards", easing: "ease-in-out" };
+    const tilt = anim("dog-lunge", [{ transform: "translateY(0) rotate(0) scale(1)" }, { transform: "translateY(-17%) rotate(-4deg) scale(1.04)", offset: .3 },
+        { transform: "translateY(-18%) rotate(-4deg) scale(1.05)", offset: .8 }, { transform: "translateY(0) rotate(0) scale(1)" }], { duration: 2900, easing: "ease-in-out" });
+    $("upper-teeth").style.display = "";
+    const open = (frames, d = 2900) => anim(frames[0], frames[1], { duration: d, ...hold });
+    const yawnAnims = [
+        open(["mouth-open", [{ opacity: 0, transform: "scaleY(.2)" }, { opacity: 1, transform: "scaleY(.95)", offset: .3 }, { opacity: 1, transform: "scaleY(1)", offset: .85 }, { opacity: 0, transform: "scaleY(.2)" }]]),
+        open(["jaw-g", [{ transform: "translateY(0)" }, { transform: "translateY(60px)", offset: .3 }, { transform: "translateY(64px)", offset: .85 }, { transform: "translateY(0)" }]]),
+        open(["jaw-teeth", [{ transform: "translateY(0)" }, { transform: "translateY(60px)", offset: .3 }, { transform: "translateY(64px)", offset: .85 }, { transform: "translateY(0)" }]]),
+        open(["jowls", [{ transform: "translateY(0)" }, { transform: "translateY(-14px) scale(1.04,.94)", offset: .3 }, { transform: "translateY(-14px) scale(1.04,.94)", offset: .85 }, { transform: "translateY(0)" }]]),
+    ];
+    await sleep(2950);
+    yawnAnims.forEach(a => a.cancel()); tilt.cancel();
+    if (!biting) $("upper-teeth").style.display = "none";
+    if (biting || isGameOver) { yawning = false; return; }
+    // 打完哈欠：舔嘴、咬咬嘴巴
+    SFX.chew(); SFX.smack();
+    say("吧唧吧唧…", 300, 380, 1400);
+    anim("tongue-lick", [
+        { opacity: 1, transform: "translate(0,-28px)" }, { opacity: 1, transform: "translate(-14px,6px) rotate(-12deg)", offset: .3 },
+        { opacity: 1, transform: "translate(14px,6px) rotate(12deg)", offset: .6 }, { opacity: 0, transform: "translate(0,-28px)" }], { duration: 1000 });
+    anim("jaw-g", [{ transform: "translateY(0)" }, { transform: "translateY(14px)" }, { transform: "translateY(0)" }], { duration: 220, iterations: 4 });
+    anim("jaw-teeth", [{ transform: "translateY(0)" }, { transform: "translateY(14px)" }, { transform: "translateY(0)" }], { duration: 220, iterations: 4 });
+    await sleep(1100);
+    yawning = false;
+    if (!biting && !isGameOver) startBreathing();
+}
+function fakeGrind() {
+    if (biting || isGameOver) return;
+    lastFake = performance.now();
+    SFX.grind();
+    say("嘎吱嘎吱…", 300, 395, 1700);
+    const side = [{ transform: "translateX(0)" }, { transform: "translateX(-9px)" }, { transform: "translateX(9px)" }, { transform: "translateX(0)" }];
+    anim("jaw-g", side, { duration: 210, iterations: 8 });
+    anim("jaw-teeth", side, { duration: 210, iterations: 8 });
+    anim("jowls", [{ transform: "rotate(0)" }, { transform: "rotate(-1.5deg)" }, { transform: "rotate(1.5deg)" }, { transform: "rotate(0)" }], { duration: 210, iterations: 8 });
+}
+// 平常沒人碰的時候，狗也偶爾打哈欠、磨牙
+function scheduleIdle() {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+        if (gameStarted && !isGameOver && !biting && !isDragActive && !yawning && !agitated && performance.now() - lastFake > 3000) {
+            Math.random() < .55 ? fakeYawn() : fakeGrind();
+        }
+        scheduleIdle();
+    }, rnd(9000, 17000));
+}
+function fakeWhimper() { SFX.whimper(); say("嗚～", 450, 80); }
+
+/* ================= 真的發作：咬人 ================= */
+let biting = false;
+async function triggerBite(reason, mineBone = null) {
+    if (biting || isGameOver) return;
+    biting = true;
+    globalInteractionLock = true;
+    stopTurnTimer();
+    if (isDragActive) {
+        isDragActive = false; clearInterval(dragTimer); removeDragListeners();
+        if (currentTargetBone) { returnBoneToField(currentTargetBone); currentTargetBone = null; }
+    }
+    if (mineBone) mineBone.classList.add("boom");
+    document.querySelectorAll(".basket").forEach(b => b.classList.remove("hovered"));
+
+    const loserIdx = currentPlayerIdx, loser = players[loserIdx];
+    const basketEl = $(`basket-${loserIdx}`);
+    try { speechSynthesis.cancel(); } catch (e) {}
+    stopBreathing();
+    ensureAudio();
+    SFX.bite();
+    setMsg(reason === "timeout" ? "⏰ 時間到！狗醒了！！" : "💣 碰到暗雷骨頭！狗醒了！！");
+
+    // 1) 睜眼、低吼、抖動
+    $("eyeL-closed").style.display = "none"; $("eyeR-closed").style.display = "none";
+    $("eyeL-open").style.display = ""; $("eyeR-open").style.display = ""; $("brows").style.display = "";
+    anim("eyeL-open", [{ transform: "scale(.2,0)" }, { transform: "scale(1.15,1.2)" }, { transform: "scale(1,1)" }], { duration: 300, fill: "forwards" });
+    anim("eyeR-open", [{ transform: "scale(.2,0)" }, { transform: "scale(1.15,1.2)" }, { transform: "scale(1,1)" }], { duration: 300, fill: "forwards" });
+    $("stage").classList.add("dim");
+    anim("dog-lunge", [{ transform: "translate(0,0)" }, { transform: "translate(-4px,2px)" }, { transform: "translate(4px,-2px)" }, { transform: "translate(0,0)" }], { duration: 120, iterations: 5 });
+    await sleep(600);
+
+    // 2) 撲出：張大嘴、放大、衝向被咬的玩家
+    $("stage").classList.remove("dim");
+    const st = $("stage").getBoundingClientRect(), br = basketEl.getBoundingClientRect();
+    const dx = ((br.left + br.width / 2) - (st.left + st.width / 2)) * .3;
+    $("dog-wrap").classList.add("front");
+    $("upper-teeth").style.display = "";
+    const open = { duration: 220, fill: "forwards", easing: "cubic-bezier(.2,1.6,.4,1)" };
+    const openAnims = [
+        anim("mouth-open", [{ opacity: 0, transform: "scaleY(.3)" }, { opacity: 1, transform: "scaleY(1)" }], open),
+        anim("jaw-g", [{ transform: "translateY(0)" }, { transform: "translateY(78px)" }], open),
+        anim("jaw-teeth", [{ transform: "translateY(0)" }, { transform: "translateY(78px)" }], open),
+        anim("jowls", [{ transform: "translateY(0)" }, { transform: "translateY(-16px) scale(1.06,.92)" }], open),
+    ];
+    const lunge = anim("dog-lunge", [
+        { transform: "translate(0,0) scale(1)" },
+        { transform: `translate(${dx}px, 12%) scale(1.42)`, offset: .25 },
+        { transform: `translate(${dx * .9}px, 9%) scale(1.38) rotate(-3deg)`, offset: .45 },
+        { transform: `translate(${dx}px, 11%) scale(1.41) rotate(3deg)`, offset: .65 },
+        { transform: `translate(${dx * .9}px, 9%) scale(1.38)` }], { duration: 1500, fill: "forwards", easing: "ease-out" });
+    const paws = anim("paws-lunge", [{ transform: "translateY(0)" }, { transform: "translateY(-14%)", offset: .15 }, { transform: "translateY(4%)", offset: .3 }, { transform: "translateY(0)" }], { duration: 700 });
+    anim("flash", [{ opacity: 0 }, { opacity: .95, background: "#fff" }, { opacity: .7, background: "#ff0018" }, { opacity: 0, background: "#ff0018" }], { duration: 650 });
+    anim("speedlines", [{ opacity: 0 }, { opacity: 1, offset: .15 }, { opacity: .8, offset: .7 }, { opacity: 0 }], { duration: 1600 });
+    anim("gao-text", [
+        { opacity: 0, transform: "translate(-50%,-50%) scale(3) rotate(-14deg)" },
+        { opacity: 1, transform: "translate(-50%,-50%) scale(.9) rotate(-8deg)", offset: .12 },
+        { opacity: 1, transform: "translate(-50%,-50%) scale(1.05) rotate(-6deg)", offset: .25 },
+        { opacity: 1, transform: "translate(-50%,-50%) scale(1) rotate(-8deg)", offset: .8 },
+        { opacity: 0, transform: "translate(-50%,-50%) scale(1.3) rotate(-8deg)" }], { duration: 1700 });
+    $("stage").classList.add("shake");
+    document.body.animate([{ transform: "translate(0,0)" }, { transform: "translate(-12px,8px)" }, { transform: "translate(10px,-10px)" }, { transform: "translate(0,0)" }], { duration: 90, iterations: 12 });
+
+    // 3) 咬住籃子
+    await sleep(620);
+    if (mineBone) {   // 暗雷骨頭被狗吃掉
+        mineBone.animate([{ opacity: 1 }, { opacity: 0, transform: "translate(-50%,-50%) scale(2.2)" }], { duration: 400 }).onfinish = () => { mineBone.remove(); updateDebug(); };
+    }
+    const outMode = gameBiteMode === "out";
+    let knockedOut = false;
+    chompBasket(basketEl);
+    anim("jaw-g", [{ transform: "translateY(78px)" }, { transform: "translateY(10px)" }, { transform: "translateY(78px)" }], { duration: 260, iterations: 2 });
+    anim("jaw-teeth", [{ transform: "translateY(78px)" }, { transform: "translateY(10px)" }, { transform: "translateY(78px)" }], { duration: 260, iterations: 2 });
+    if (outMode) {
+        loser.hp = Math.max(0, loser.hp - 1);
+        const hEl = $(`hearts-${loserIdx}`);
+        hEl.innerHTML = heartsHTML(loser);
+        hEl.classList.remove("hit"); void hEl.offsetWidth; hEl.classList.add("hit");
+        if (loser.maxHp > 1) floatHeart(basketEl);
+        knockedOut = loser.hp <= 0;
+        if (knockedOut) {
+            loser.eliminated = true;
+            basketEl.classList.remove("active");
+            basketEl.classList.add("eliminated");
+        } else {
+            basketEl.classList.add("bitten");
+            setTimeout(() => basketEl.classList.remove("bitten"), 1300);
+        }
+    } else {
+        basketEl.classList.add("bitten");
+        setTimeout(() => basketEl.classList.remove("bitten"), 1300);
+    }
+    await sleep(900);
+    $("stage").classList.remove("shake");
+    if (outMode && !knockedOut) {
+        speak(`${loser.name}被咬到了！扣一滴血，還剩${["零","一","兩","三","四","五"][loser.hp]}滴血！`);
+        setMsg(`💔 ${loser.name} 扣 1 滴血，還剩 ${loser.hp} 滴！`);
+    } else {
+        speak(outMode ? `${loser.name}被咬到了！出局！` : `${loser.name}被咬到了！骨頭全部倒回去！`);
+        setMsg(outMode ? `💥 ${loser.name} 被咬到，出局！` : `💥 ${loser.name} 被咬到！骨頭全部倒回盤子`);
+    }
+    rageLevel++;
+    await sleep(900);
+
+    // 4) 回去睡覺
+    SFX.grumble();
+    lunge.cancel(); openAnims.forEach(a => a.cancel());
+    anim("dog-lunge", [{ transform: `translate(${dx * .9}px,9%) scale(1.38)` }, { transform: "translate(0,0) scale(1)" }], { duration: 700, easing: "ease-in-out" });
+    setTimeout(() => $("dog-wrap").classList.remove("front"), 650);
+    $("upper-teeth").style.display = "none";
+    $("brows").style.display = "none";
+    $("eyeL-open").getAnimations().forEach(a => a.cancel()); $("eyeR-open").getAnimations().forEach(a => a.cancel());
+    $("eyeL-open").style.display = "none"; $("eyeR-open").style.display = "none";
+    $("eyeL-closed").style.display = ""; $("eyeR-closed").style.display = "";
+    $("dog-pose").style.transform = ""; $("paws-pose").style.transform = ""; pose = 0;
+    agitated = false;
+    await sleep(800);
+    biting = false;
+    startBreathing();
+
+    // 5) 被咬的人的骨頭：倒回盤子（或依設定留在自己籃子）
+    const keepBones = outMode && gameBoneKeep === "keep";
+    if (keepBones && loser.score > 0) {
+        setMsg(`🦴 ${loser.name} 的 ${loser.score} 根骨頭保留在籃子裡`);
+        await sleep(900);
+    }
+    if (loser.score > 0 && !keepBones) {
+        setMsg(`🦴 ${loser.name} 的骨頭全部倒回盤子…`);
+        await returnBasketBones(loserIdx);
+        await sleep(300);
+    }
+    // 計分模式：有人被咬死 → 立刻結算
+    if (outMode && knockedOut && gameEndMode === "score") {
+        updateDebug();
+        return endGame(-1, "score");
+    }
+    // 6) 出局模式：狗再偷偷藏新的暗雷
+    if (outMode) {
+        replenishMines();
+        setMsg("🤫 狗又偷偷藏好新的暗雷了…");
+        SFX.whimper();
+        await sleep(1400);
+    }
+    updateDebug();
+
+    const survivors = players.filter(p => !p.eliminated);
+    if (survivors.length <= 1) return endGame(survivors.length ? players.indexOf(survivors[0]) : -1, survivors.length ? "survivor-win" : "all-dead");
+    if (fieldCount() <= 0) return checkScoreWinner();
+    nextTurn();
+}
+function floatHeart(el) {
+    const r = el.getBoundingClientRect();
+    const f = document.createElement("div");
+    f.textContent = "💔 -1";
+    f.style.cssText = `position:fixed;left:${r.left + r.width / 2}px;top:${r.top + 20}px;z-index:75;font-size:54px;font-weight:900;color:#e00;pointer-events:none;-webkit-text-stroke:2px #fff;paint-order:stroke fill;`;
+    document.body.appendChild(f);
+    f.animate([{ transform: "translate(-50%,0) scale(.4)", opacity: 0 }, { transform: "translate(-50%,-60px) scale(1.2)", opacity: 1, offset: .25 },
+        { transform: "translate(-50%,-130px) scale(1)", opacity: 0 }], { duration: 1600, easing: "ease-out" }).onfinish = () => f.remove();
+}
+async function returnBasketBones(idx) {
+    const inv = $(`basket-inv-${idx}`), field = $("bone-field");
+    const fr = field.getBoundingClientRect(), bw = field.style.getPropertyValue("--bw");
+    const minis = [...inv.querySelectorAll(".mini-bone")];
+    const jobs = minis.map((m, i) => new Promise(res => {
+        const r = m.getBoundingClientRect(), color = m.dataset.color || "white";
+        const x = rnd(4, 96), y = rnd(12, 88);
+        const fly = document.createElement("div");
+        fly.className = "bone dragging"; fly.style.width = bw; fly.innerHTML = boneSVG(color);
+        const sx = r.left + r.width / 2, sy = r.top + r.height / 2;
+        fly.style.left = sx + "px"; fly.style.top = sy + "px";
+        setTimeout(() => {
+            m.remove();
+            document.body.appendChild(fly);
+            SFX.pick();
+            fly.animate([{ left: sx + "px", top: sy + "px" }, { left: (fr.left + fr.width * x / 100) + "px", top: (fr.top + fr.height * y / 100 - 80) + "px", offset: .6 },
+                { left: (fr.left + fr.width * x / 100) + "px", top: (fr.top + fr.height * y / 100) + "px" }],
+                { duration: 650, easing: "ease-in-out", fill: "forwards" }).onfinish = () => { fly.remove(); field.appendChild(makeBone(color, x, y)); res(); };
+        }, i * 110);
+    }));
+    players[idx].score = 0;
+    $(`score-lbl-${idx}`).textContent = 0;
+    await Promise.all(jobs);
+}
+function chompBasket(el) {
+    const c = document.createElement("div");
+    c.className = "chomp";
+    const teeth = (flip) => {
+        let pts = "";
+        for (let i = 0; i <= 10; i++) pts += `${i * 10},${i % 2 ? 100 : 30} `;
+        return `<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="${flip ? "bottom:0;transform:scaleY(-1)" : "top:0"}">
+            <rect x="0" y="0" width="100" height="32" fill="#4a0a0a"/>
+            <polygon points="0,30 ${pts} 100,30" fill="#fffbe8" stroke="#888" stroke-width="1"/></svg>`;
+    };
+    c.innerHTML = teeth(false) + teeth(true);
+    el.appendChild(c);
+    const [top, bot] = c.querySelectorAll("svg");
+    top.animate([{ transform: "translateY(-100%)" }, { transform: "translateY(0)" }, { transform: "translateY(-15%)" }, { transform: "translateY(0)" }], { duration: 500, fill: "forwards" });
+    bot.animate([{ transform: "scaleY(-1) translateY(-100%)" }, { transform: "scaleY(-1) translateY(0)" }, { transform: "scaleY(-1) translateY(-15%)" }, { transform: "scaleY(-1) translateY(0)" }], { duration: 500, fill: "forwards" });
+    el.animate([{ transform: "rotate(0)" }, { transform: "rotate(-6deg) scale(1.05)" }, { transform: "rotate(6deg) scale(1.05)" }, { transform: "rotate(0)" }], { duration: 160, iterations: 6 });
+    setTimeout(() => c.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 600 }).onfinish = () => c.remove(), 1600);
+}
+
+/* ================= 結算 ================= */
+function checkScoreWinner() {
+    let max = -1, w = -1;
+    players.forEach((p, i) => { if (!p.eliminated && p.score > max) { max = p.score; w = i; } });
+    endGame(w, w === -1 ? "all-dead" : "bone-empty");
+}
+function endGame(winnerIdx, reason) {
+    if (isGameOver) return;
+    isGameOver = true; globalInteractionLock = true;
+    clearInterval(dragTimer); stopTurnTimer(); clearTimeout(idleTimer);
+    const msg = reason === "survivor-win" ? "🏆 其他人都被咬出局，最後倖存者獲勝！"
+        : reason === "score" ? "🏁 有人被狗咬死了！遊戲結束，大家比骨頭數量！"
+        : reason === "bone-empty" ? "🍖 骨頭被拿光了！依骨頭數量排名！"
+        : "😱 全軍覆沒！大家都被狗咬了！";
+    setMsg(msg);
+    document.querySelectorAll(".basket").forEach(b => b.classList.remove("active"));
+
+    // 排名：計分模式只比骨頭；其他模式先比「有沒有活著」，再比骨頭
+    const byScoreOnly = reason === "score" || gameBiteMode === "reset";
+    const key = p => byScoreOnly ? -p.score : (p.eliminated ? 1000 : 0) - p.score;
+    const sorted = players.slice().sort((a, b) => key(a) - key(b));
+    let rank = 0, prev = null;
+    sorted.forEach((p, i) => { if (key(p) !== prev) { rank = i + 1; prev = key(p); } p.rank = rank; });
+    const firsts = sorted.filter(p => p.rank === 1);
+    firsts.forEach(p => {
+        const idx = players.indexOf(p), wb = $(`basket-${idx}`);
+        wb.classList.add("winner-crown");
+        wb.querySelector(".basket-title").innerHTML = `👑 ${p.name}`;
+    });
+    players.forEach((p, idx) => {
+        if (p.rank === 1) return;
+        const t = $(`basket-${idx}`).querySelector(".basket-title");
+        t.innerHTML = `第${p.rank}名 ${p.name}`;
+    });
+    if (firsts.length && !(reason === "all-dead" && !byScoreOnly && firsts[0].score === 0)) {
+        SFX.win();
+        speak(`恭喜${firsts.map(p => p.name).join("和")}得到第一名！`);
+    }
+    setTimeout(() => {
+        $("end-msg").textContent = msg;
+        const medal = r => r === 1 ? "🥇" : r === 2 ? "🥈" : r === 3 ? "🥉" : "　";
+        $("end-list").innerHTML = sorted.map(p =>
+            `${medal(p.rank)} <b>第 ${p.rank} 名</b>　${p.name}：🦴 ${p.score} 根 ${p.eliminated ? "<span style='color:#999'>（被咬出局）</span>" : ""}`).join("<br>");
+        $("end-overlay").classList.add("on");
+    }, 3500);
+}
+window.addEventListener("resize", () => { /* 骨頭以百分比定位，自動跟著縮放 */ });
+</script>
+</body>
+</html>

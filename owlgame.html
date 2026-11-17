@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>貓頭鷹回家 Hoot Owl Hoot v3</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;user-select:none;}
+html,body{height:100%;margin:0;}
+body{font-family:"Microsoft JhengHei","PingFang TC","Segoe UI",sans-serif;background:#141826;color:#f5f6fa;overflow:hidden;transition:background 1.5s;}
+body.st-dawn{background:#33284a;}
+body.st-day{background:#3b6f9e;}
+body.st-hot{background:#c96a12;}
+body.st-fire{background:#8e1b12;}
+button{font-family:inherit;}
+
+/* 設定 */
+#setup-screen{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#25283d;border:1px solid #484b6a;border-radius:20px;padding:26px 30px;width:min(560px,92vw);max-height:94vh;overflow:auto;box-shadow:0 10px 30px rgba(0,0,0,.4);}
+#setup-screen h1{margin:0 0 14px;text-align:center;color:#ffdd57;font-size:30px;}
+.form-group{margin-bottom:16px;}
+.form-group label{display:block;margin-bottom:6px;font-weight:bold;color:#ffdd57;}
+.form-group select,.form-group input{width:100%;padding:10px;border-radius:8px;border:1px solid #484b6a;background:#1a1c29;color:#fff;font-size:16px;margin-bottom:6px;}
+.btn{background:#4cd137;color:#1a1c29;border:none;padding:13px 24px;font-size:18px;font-weight:900;border-radius:12px;cursor:pointer;width:100%;}
+.btn:hover{filter:brightness(1.08);}
+
+/* 主畫面：左太陽直條｜中版圖｜右玩家 */
+#game{display:none;height:100vh;padding:10px 12px;gap:12px;grid-template-columns:clamp(86px,6.5vw,124px) minmax(0,1fr) clamp(250px,21vw,370px);}
+#game.on{display:grid;}
+
+/* 太陽直條：上＝日出(終點)、下＝起點 */
+#sun-col{display:flex;flex-direction:column;background:linear-gradient(to top,#111424,#2a1b40 35%,#692d42 60%,#b56c4c 80%,#f2c46b);border:3px solid #3a3f58;border-radius:20px;padding:8px 7px;gap:4px;min-height:0;box-shadow:inset 0 0 14px rgba(0,0,0,.5);}
+#sun-col .lbl{font-size:clamp(12px,1vw,16px);font-weight:900;text-align:center;color:#fff;text-shadow:0 2px 3px #000;flex:none;}
+#sun-track{flex:1;display:flex;flex-direction:column-reverse;gap:4px;min-height:0;}
+.sun-cell{flex:1;min-height:0;border-radius:10px;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;font-size:clamp(16px,1.6vw,28px);position:relative;}
+.sun-cell.start{background:rgba(255,255,255,.28);border:2px solid #ffdd57;}
+.sun-cell.end{background:linear-gradient(135deg,#e74c3c,#f39c12);border:2px solid #ffdd57;}
+.sun-cell .n{position:absolute;left:4px;top:1px;font-size:10px;opacity:.6;}
+.sun-token{height:118%;max-width:100%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 40% 35%,#fff6a0,#ffd000 45%,#ff9800);box-shadow:0 0 18px 8px rgba(255,214,0,.85),0 0 40px 14px rgba(255,140,0,.45);display:flex;align-items:center;justify-content:center;font-size:clamp(24px,2.4vw,40px);animation:sunGlow 1.4s infinite alternate;z-index:2;}
+@keyframes sunGlow{from{transform:scale(1) rotate(0);}to{transform:scale(1.1) rotate(25deg);}}
+.sun-token.moved{animation:sunRise .9s cubic-bezier(.3,1.6,.5,1),sunGlow 1.4s .9s infinite alternate;}
+@keyframes sunRise{0%{transform:translateY(120%) scale(.6);}100%{transform:translateY(0) scale(1);}}
+#sun-left{flex:none;text-align:center;font-weight:900;font-size:clamp(12px,1vw,16px);color:#ffdd57;text-shadow:0 2px 3px #000;}
+
+/* 版圖 */
+#board-area{position:relative;min-width:0;min-height:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 50%,#1e2a1f 0%,#121a14 70%);border-radius:24px;border:3px solid #2e3b2f;overflow:hidden;}
+#board{width:100%;height:100%;}
+.slot{cursor:pointer;}
+.owl{cursor:pointer;}
+.owl .inner{transform-box:fill-box;transform-origin:50% 60%;}
+.owl.can .inner{animation:owlPulse .7s infinite alternate;}
+.owl.can .ring{display:inline;}
+.owl .ring{display:none;}
+@keyframes owlPulse{from{transform:scale(1);}to{transform:scale(1.13);}}
+.preview{animation:prev .6s infinite alternate;}
+@keyframes prev{from{opacity:.4;}to{opacity:1;}}
+#toast{position:absolute;left:50%;top:18px;transform:translateX(-50%);background:#fff;color:#333;border:4px solid #e74c3c;border-radius:18px;padding:10px 24px;font-size:clamp(18px,1.6vw,28px);font-weight:900;display:none;z-index:20;white-space:nowrap;box-shadow:0 8px 20px rgba(0,0,0,.4);}
+#toast.on{display:block;animation:toastIn .4s cubic-bezier(.3,1.6,.5,1);}
+@keyframes toastIn{from{transform:translateX(-50%) scale(.4);}to{transform:translateX(-50%) scale(1);}}
+#fire{position:absolute;inset:0;pointer-events:none;display:none;background:radial-gradient(circle at 50% 110%,rgba(255,120,0,.75),rgba(200,20,0,.35) 50%,transparent 75%);animation:flick .25s infinite alternate;z-index:15;}
+@keyframes flick{from{opacity:.75;}to{opacity:1;}}
+
+/* 右側 */
+#right{display:flex;flex-direction:column;gap:10px;min-height:0;}
+#turn-box{background:#25283d;border:3px solid #ffdd57;border-radius:16px;padding:10px 12px;flex:none;}
+#turn-name{font-size:clamp(20px,1.8vw,30px);font-weight:900;color:#ffdd57;}
+#turn-hint{font-size:clamp(13px,1.05vw,17px);color:#dfe4f5;margin-top:4px;line-height:1.35;}
+#deck-info{display:flex;align-items:center;gap:10px;background:#25283d;border-radius:14px;padding:6px 12px;font-weight:900;font-size:clamp(14px,1.1vw,18px);flex:none;}
+#deck-pile{width:42px;height:52px;border-radius:8px;background:repeating-linear-gradient(45deg,#3d4a8a 0 6px,#33407a 6px 12px);border:3px solid #fff;box-shadow:3px 3px 0 #1b2050;}
+#players{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px;padding:4px 4px 4px 2px;}
+.pbox{background:#25283d;border:3px solid #3a3f58;border-radius:14px;padding:8px 10px;opacity:.55;transition:opacity .3s,border-color .3s,transform .3s;}
+.pbox.active{opacity:1;border-color:#4cd137;box-shadow:0 0 18px rgba(76,209,55,.6);transform:scale(1.02);}
+.pname{font-weight:900;font-size:clamp(15px,1.25vw,21px);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;}
+.pname .now{display:none;background:#4cd137;color:#111;border-radius:8px;padding:0 8px;font-size:.8em;}
+.pbox.active .now{display:inline;animation:nowPulse .8s infinite alternate;}
+@keyframes nowPulse{from{transform:scale(1);}to{transform:scale(1.1);}}
+.hand{display:flex;gap:8px;padding-top:8px;}
+.gcard{width:clamp(50px,4.4vw,80px);aspect-ratio:1;border-radius:12px;background:#fff;border:3px solid #ccc;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .15s,box-shadow .15s;position:relative;}
+.gcard:hover{transform:translateY(-3px);}
+.gcard .dot{width:68%;aspect-ratio:1;border-radius:50%;box-shadow:inset 0 -4px 0 rgba(0,0,0,.2);}
+.gcard.sun{background:#ffd93b;border-color:#f0a500;font-size:clamp(28px,2.6vw,46px);}
+.gcard.sel{transform:translateY(-8px) scale(1.08);box-shadow:0 0 0 4px #ffdd57,0 0 22px 6px #ffdd57;}
+.gcard.must{animation:must .6s infinite alternate;}
+@keyframes must{from{box-shadow:0 0 0 3px #ff5252;}to{box-shadow:0 0 0 6px #ff5252,0 0 24px 8px #ff9800;}}
+.gcard.dealt{animation:deal .6s cubic-bezier(.2,1.4,.5,1);}
+@keyframes deal{0%{transform:translate(-160px,-140px) rotate(-200deg) scale(.3);opacity:0;}60%{opacity:1;}100%{transform:none;}}
+.many .pbox{padding:5px 8px;} .many .pname{margin-bottom:0;font-size:clamp(14px,1.1vw,18px);} .many .hand{padding-top:4px;gap:6px;}
+.many .gcard{width:clamp(38px,3.1vw,58px);border-radius:9px;}
+#layer-preview text{pointer-events:none;}
+#right:has(.many) #log{max-height:7vh;}
+#right:has(.many) #turn-hint{font-size:13px;}
+#log{flex:none;max-height:16vh;overflow:auto;background:rgba(0,0,0,.25);border-radius:12px;padding:6px 10px;font-size:clamp(12px,.95vw,15px);line-height:1.5;color:#cfd3e6;}
+
+/* 橫幅、結束 */
+#banner{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:60;}
+#banner .ban{background:var(--bc,#2f8f3a);color:#fff;text-align:center;font-size:clamp(32px,4.4vw,78px);font-weight:900;padding:20px 56px;border-radius:60px;border:8px solid #fff;box-shadow:0 20px 60px rgba(0,0,0,.4);text-shadow:0 4px 0 rgba(0,0,0,.25);transform:translateX(-130vw);}
+#banner .ban small{display:block;font-size:.48em;margin-top:6px;}
+#banner.show .ban{animation:banner var(--bd,1.6s) cubic-bezier(.2,.9,.3,1) forwards;}
+@keyframes banner{0%{transform:translateX(-130vw) rotate(-6deg);}18%{transform:translateX(0) rotate(2deg) scale(1.06);}28%{transform:translateX(0) scale(1);}82%{transform:translateX(0);}100%{transform:translateX(130vw) rotate(6deg);}}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:90;align-items:center;justify-content:center;}
+.modal-content{background:#25283d;border:3px solid #ffdd57;border-radius:20px;padding:28px;text-align:center;width:min(560px,92vw);}
+.modal-content h2{margin:0 0 12px;font-size:30px;}
+.modal-content p{font-size:19px;line-height:1.6;}
+/* ================= 貓頭鷹媽媽 ================= */
+#mom{position:fixed;left:-300px;top:0;z-index:70;width:var(--mw,130px);height:calc(var(--mw,130px) * 1.12);cursor:grab;touch-action:none;}
+#mom.dragging{cursor:grabbing;z-index:99;}
+#mom svg{width:100%;height:100%;overflow:visible;display:block;}
+#mom .flip{width:100%;height:100%;transform:scaleX(var(--fx,1));transition:transform .2s;}
+#mom .bub{position:absolute;left:50%;bottom:100%;margin-bottom:12px;transform:translateX(-50%);background:#fff;color:#4a2a5a;border:4px solid #c06cd4;border-radius:18px;padding:5px 14px;
+    font-size:clamp(16px,1.4vw,24px);font-weight:900;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .2s;box-shadow:0 4px 12px rgba(0,0,0,.3);}
+#mom .bub.on{opacity:1;}
+#mom .bub::before{content:'';position:absolute;left:50%;top:100%;margin-left:-11px;border:solid transparent;border-width:12px 11px 0;border-top-color:#c06cd4;}
+#mom .bub.side{bottom:auto;top:10%;left:calc(100% + 16px);transform:none;margin:0;}
+#mom .bub.side::before{left:auto;right:100%;top:50%;margin:-11px 0 0;border-width:11px 14px 11px 0;border-color:transparent #c06cd4 transparent transparent;}
+#mom .bub.sideL{bottom:auto;top:10%;left:auto;right:calc(100% + 16px);transform:none;margin:0;}
+#mom .bub.sideL::before{left:100%;top:50%;margin:-11px 0 0;border-width:11px 0 11px 14px;border-color:transparent transparent transparent #c06cd4;}
+#mom .side,#mom .eC,#mom .eH,#mom .mO,#mom .sweat{display:none;}
+#mom.side-view .front{display:none;} #mom.side-view .side{display:inline;}
+#mom.e-closed .eN{display:none;} #mom.e-closed .eC{display:inline;}
+#mom.e-happy .eN{display:none;} #mom.e-happy .eH{display:inline;}
+#mom.m-open .mO{display:inline;}
+#mom.pant .sweat{display:inline;}
+#mom .wl{transform-box:view-box;transform-origin:-30px -4px;}
+#mom .wr{transform-box:view-box;transform-origin:30px -4px;}
+#mom.flap .wl{animation:wlF .16s infinite alternate ease-in-out;} #mom.flap .wr{animation:wrF .16s infinite alternate ease-in-out;}
+@keyframes wlF{from{transform:rotate(25deg);}to{transform:rotate(-55deg);}} @keyframes wrF{from{transform:rotate(-25deg);}to{transform:rotate(55deg);}}
+#mom.fan .wl{animation:wlB .32s infinite alternate ease-in-out;} #mom.fan .wr{animation:wrB .32s infinite alternate ease-in-out;}
+@keyframes wlB{from{transform:rotate(30deg);}to{transform:rotate(-80deg);}} @keyframes wrB{from{transform:rotate(-30deg);}to{transform:rotate(80deg);}}
+#mom.spread .wl{transform:rotate(-80deg) scale(1.3);} #mom.spread .wr{transform:rotate(80deg) scale(1.3);}
+#mom.drag .wl{animation:wlF .09s infinite alternate;} #mom.drag .wr{animation:wrF .09s infinite alternate;}
+#mom.drag .flip{animation:wob .35s infinite alternate ease-in-out;transform-origin:50% 5%;}
+@keyframes wob{from{transform:rotate(-12deg);}to{transform:rotate(12deg);}}
+#mom .bodyG{transform-box:view-box;transform-origin:0 60px;}
+#mom.pant .bodyG{animation:pantA .35s infinite alternate;}
+@keyframes pantA{from{transform:scale(1,1);}to{transform:scale(1.05,.94);}}
+#mom.hover .flip{animation:hov 1.1s infinite alternate ease-in-out;}
+@keyframes hov{from{transform:scaleX(var(--fx,1)) translateY(0);}to{transform:scaleX(var(--fx,1)) translateY(-8px);}}
+#mom .shead{transform-box:view-box;transform-origin:0 -20px;}
+#mom.peck .shead{animation:peckA .16s infinite alternate ease-in;}
+@keyframes peckA{from{transform:translateX(0) rotate(0);}to{transform:translateX(14px) rotate(10deg);}}
+.wind{position:fixed;z-index:69;height:6px;border-radius:3px;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.95));pointer-events:none;transform-origin:0 50%;}
+.momfx{position:fixed;z-index:71;pointer-events:none;}
+#mute-btn{position:fixed;right:14px;bottom:14px;z-index:80;width:50px;height:50px;border-radius:50%;border:none;background:#fff;font-size:24px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.3);}
+.confetti{position:fixed;top:-20px;width:12px;height:18px;border-radius:3px;z-index:95;pointer-events:none;}
+</style>
+</head>
+<body>
+
+<button id="mute-btn" onclick="toggleMute()" title="聲音開關">🔊</button>
+
+<div id="setup-screen">
+    <h1>🦉 貓頭鷹回家</h1>
+    <div class="form-group">
+        <label for="player-count">玩家人數（原版 2–4 人，5–6 人也可以玩，平衡不變）：</label>
+        <select id="player-count" onchange="updatePlayerInputs()">
+            <option value="2">2 人</option><option value="3" selected>3 人</option><option value="4">4 人</option>
+            <option value="5">5 人</option><option value="6">6 人</option>
+        </select>
+    </div>
+    <div class="form-group"><label>玩家姓名：</label><div id="player-names-container"></div></div>
+    <div class="form-group">
+        <label for="owl-count">難度（原版規則）：</label>
+        <select id="owl-count">
+            <option value="3">新手：3 隻貓頭鷹（起始位置 1、2、3）</option>
+            <option value="4" selected>普通：4 隻貓頭鷹（起始位置 1–4）</option>
+            <option value="6">困難：6 隻貓頭鷹（起始位置 1–6）</option>
+            <option value="5">自訂：5 隻貓頭鷹</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label for="sun-len">太陽軌道長度（調整整體難度，跟人數無關）：</label>
+        <select id="sun-len">
+            <option value="14">寬鬆：14 格（14 張太陽卡全部打完才天亮）</option>
+            <option value="13" selected>原版：13 格</option>
+            <option value="11">挑戰：11 格</option>
+        </select>
+    </div>
+    <button class="btn" onclick="startGame()">開始合作挑戰 ➔</button>
+</div>
+
+<div id="game">
+    <div id="sun-col">
+        <div class="lbl">🔥 天亮</div>
+        <div id="sun-track"></div>
+        <div class="lbl">🌑 起點</div>
+        <div id="sun-left"></div>
+    </div>
+    <div id="board-area">
+        <svg id="board" viewBox="0 0 760 760" preserveAspectRatio="xMidYMid meet">
+            <defs>
+                <radialGradient id="gBowl" cx="50%" cy="45%" r="60%">
+                    <stop offset="0" stop-color="#2a170b"/><stop offset=".7" stop-color="#3f2412"/><stop offset="1" stop-color="#5a3519"/>
+                </radialGradient>
+                <radialGradient id="gSlot" cx="35%" cy="30%" r="75%">
+                    <stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/>
+                </radialGradient>
+                <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity=".55"/></filter>
+            </defs>
+            <g id="layer-path"></g>
+            <g id="layer-nest"></g>
+            <g id="layer-slots"></g>
+            <g id="layer-owls"></g>
+            <g id="layer-preview"></g>
+            <g id="layer-fx"></g>
+        </svg>
+        <div id="toast"></div>
+        <div id="fire"></div>
+    </div>
+    <div id="right">
+        <div id="turn-box"><div id="turn-name">輪到…</div><div id="turn-hint"></div></div>
+        <div id="deck-info"><div id="deck-pile"></div><span>牌堆剩 <span id="deck-count">0</span> 張</span></div>
+        <div id="players"></div>
+        <div id="log"></div>
+    </div>
+</div>
+
+<div id="banner"><div class="ban" id="banner-box"></div></div>
+<div id="end-modal" class="modal"><div class="modal-content"><h2 id="end-title"></h2><p id="end-body"></p><button class="btn" onclick="location.reload()">再玩一局 ↩</button></div></div>
+
+<script>
+/* ================= 規則資料（依原版規則書） =================
+   50 張牌：14 張太陽卡 + 36 張彩色卡（6 色 × 6 張）
+   每人 3 張、正面朝上；有太陽卡一定要先打；彩色卡 → 移到前方下一個「沒被佔領」的同色格（可飛越）
+   前方沒有該顏色 → 直接飛回巢；全部回巢前太陽到最後一格就輸 */
+const COLORS = ["yellow", "blue", "red", "green", "purple", "orange"];
+const HEX = { yellow: "#f1c40f", blue: "#2e86de", red: "#e74c3c", green: "#2ecc71", purple: "#9b59b6", orange: "#e67e22" };
+const CNAME = { yellow: "黃色", blue: "藍色", red: "紅色", green: "綠色", purple: "紫色", orange: "橘色" };
+// 原版版圖（依實體版圖照片）：起點 6→1，接著 33 格路線，最後進巢
+const START_COLORS = ["yellow", "green", "orange", "blue", "purple", "red"];          // 起點6、5、4、3、2、1
+const PATH_COLORS = ["blue", "purple", "red", "yellow", "green", "blue", "orange", "red", "purple", "yellow", "green",
+    "orange", "blue", "purple", "red", "green", "yellow", "orange", "blue", "purple", "red", "yellow", "green",
+    "blue", "orange", "red", "purple", "yellow", "green", "blue", "orange", "red", "purple"];
+const track = [...START_COLORS, ...PATH_COLORS];
+const SLOTS = track.length; let MAX_SUN = 13;
+const NSTART = START_COLORS.length;
+function slotName(k) { return k < NSTART ? `起點${NSTART - k}` : `第 ${k - NSTART + 1} 格`; }
+const CX = 380, CY = 380;
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const G = { players: [], cur: 0, sun: 0, owls: [], deck: [], sel: null, nOwls: 4, over: false, busy: false };
+let slotXY = [];
+
+/* ================= 音效（大聲、即時合成） ================= */
+let soundOn = true, actx = null, master = null;
+function ensureAudio() {
+    try {
+        if (!actx) {
+            actx = new (window.AudioContext || window.webkitAudioContext)();
+            const comp = actx.createDynamicsCompressor(); comp.threshold.value = -12; comp.ratio.value = 4;
+            master = actx.createGain(); master.gain.value = 1.4; master.connect(comp); comp.connect(actx.destination);
+        }
+        if (actx.state === "suspended") actx.resume();
+    } catch (e) {}
+}
+function tone(f, dur, o = {}) {
+    if (!soundOn || !actx) return;
+    const { type = "sine", vol = .3, delay = 0, slide = null, vib = 0 } = o, t = actx.currentTime + delay;
+    const s = actx.createOscillator(), g = actx.createGain();
+    s.type = type; s.frequency.setValueAtTime(f, t); if (slide) s.frequency.exponentialRampToValueAtTime(slide, t + dur);
+    if (vib) { const l = actx.createOscillator(), lg = actx.createGain(); l.frequency.value = 6; lg.gain.value = vib; l.connect(lg); lg.connect(s.frequency); l.start(t); l.stop(t + dur + .05); }
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .01); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    s.connect(g); g.connect(master); s.start(t); s.stop(t + dur + .05);
+}
+function noise(dur, o = {}) {
+    if (!soundOn || !actx) return;
+    const { vol = .3, delay = 0, from = 800, to = 3000, q = 1, type = "bandpass" } = o, t = actx.currentTime + delay;
+    const len = Math.floor(actx.sampleRate * dur), buf = actx.createBuffer(1, len, actx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const src = actx.createBufferSource(); src.buffer = buf;
+    const f = actx.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.setValueAtTime(from, t); f.frequency.exponentialRampToValueAtTime(to, t + dur);
+    const g = actx.createGain(); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .01); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(master); src.start(t); src.stop(t + dur + .05);
+}
+const SFX = {
+    click() { tone(900, .07, { type: "square", vol: .15 }); },
+    deal()  { noise(.18, { from: 900, to: 5000, vol: .5 }); tone(520, .1, { type: "triangle", vol: .25, slide: 1000, delay: .05 }); noise(.04, { type: "highpass", from: 3000, to: 3000, vol: .45, delay: .17 }); },
+    select(){ tone(660, .1, { type: "triangle", vol: .3 }); tone(990, .16, { type: "triangle", vol: .3, delay: .08 }); },
+    step()  { tone(380, .12, { type: "triangle", vol: .45, slide: 760 }); noise(.05, { from: 1500, to: 900, q: 2, vol: .35, delay: .1 }); },
+    hoot()  { tone(440, .26, { vol: .55, slide: 400, vib: 12 }); tone(220, .26, { type: "triangle", vol: .25, slide: 200 });
+              tone(420, .5, { vol: .55, slide: 360, vib: 14, delay: .32 }); tone(210, .5, { type: "triangle", vol: .25, slide: 180, delay: .32 }); },
+    land()  { tone(180, .2, { vol: .5, slide: 90 }); noise(.12, { type: "lowpass", from: 900, to: 300, vol: .4 }); },
+    home()  { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, .3, { type: "triangle", vol: .3, delay: i * .09 })); for (let i = 0; i < 8; i++) tone(2000 + Math.random() * 2000, .15, { vol: .08, delay: .5 + i * .06 }); },
+    sun()   { noise(.8, { from: 300, to: 3500, vol: .4 }); [392, 523, 659, 784].forEach((f, i) => tone(f, .9 - i * .1, { type: "sine", vol: .3, delay: .25 + i * .1 })); tone(98, 1.4, { type: "sawtooth", vol: .12, slide: 196 }); },
+    warn()  { for (let i = 0; i < 3; i++) { tone(880, .18, { type: "square", vol: .2, delay: i * .35 }); tone(660, .18, { type: "square", vol: .2, delay: i * .35 + .18 }); } },
+    bad()   { tone(300, .22, { type: "sawtooth", vol: .25, slide: 200 }); tone(220, .35, { type: "sawtooth", vol: .25, slide: 120, delay: .22 }); },
+    turn()  { [523, 659, 784].forEach((f, i) => tone(f, .16, { type: "triangle", vol: .25, delay: i * .1 })); },
+    win()   { const m = [523, 523, 523, 659, 784, 659, 784, 1047], tm = [0, .14, .28, .42, .62, .82, .96, 1.16]; m.forEach((f, i) => { tone(f, i === 7 ? .9 : .2, { type: "square", vol: .18, delay: tm[i] }); tone(f / 2, .2, { type: "triangle", vol: .2, delay: tm[i] }); }); },
+    lose()  { noise(1.6, { type: "lowpass", from: 2000, to: 150, vol: .7 }); [392, 349, 311, 262].forEach((f, i) => tone(f, .5, { type: "sawtooth", vol: .18, delay: .3 + i * .4 })); }
+};
+let zhVoice = null;
+function pickVoice() { try { const vs = speechSynthesis.getVoices(); zhVoice = vs.find(v => /zh[-_]TW/i.test(v.lang)) || vs.find(v => /^zh/i.test(v.lang)) || null; } catch (e) {} }
+if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+// 說完才往下走（避免下一句「輪到某某」把這句切掉）
+function speakAsync(t, minMs = 0) {
+    const t0 = performance.now();
+    return new Promise(res => {
+        let done = false; const fin = () => { if (!done) { done = true; res(); } };
+        if (!soundOn || !("speechSynthesis" in window)) { setTimeout(fin, minMs); return; }
+        try {
+            speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(t); u.lang = "zh-TW"; if (zhVoice) u.voice = zhVoice; u.rate = 1; u.pitch = 1.1;
+            u.onend = () => setTimeout(fin, Math.max(0, minMs - (performance.now() - t0))); u.onerror = fin;
+            speechSynthesis.speak(u);
+        } catch (e) { fin(); }
+        setTimeout(fin, Math.max(minMs, 2000 + t.length * 280));   // 保險
+    });
+}
+function speak(t, cancel = true) {
+    if (!soundOn || !("speechSynthesis" in window)) return;
+    try { if (cancel) speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = "zh-TW"; if (zhVoice) u.voice = zhVoice; u.rate = 1; u.pitch = 1.1; speechSynthesis.speak(u); } catch (e) {}
+}
+function toggleMute() { soundOn = !soundOn; $("mute-btn").textContent = soundOn ? "🔊" : "🔇"; if (!soundOn) try { speechSynthesis.cancel(); } catch (e) {} }
+const CN = ["零", "一", "兩", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二", "十三", "十四"];
+
+/* ================= 設定 ================= */
+function updatePlayerInputs() {
+    const n = +$("player-count").value, c = $("player-names-container");
+    c.innerHTML = ""; for (let i = 1; i <= n; i++) c.innerHTML += `<input type="text" id="pn-${i}" value="玩家 ${i}" maxlength="8">`;
+}
+updatePlayerInputs();
+function buildDeck() {
+    const d = []; for (let i = 0; i < 14; i++) d.push("sun");
+    COLORS.forEach(c => { for (let i = 0; i < 6; i++) d.push(c); });
+    for (let i = d.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [d[i], d[j]] = [d[j], d[i]]; }
+    return d;
+}
+function log(m) { const b = $("log"); b.innerHTML += `<div>${m}</div>`; b.scrollTop = b.scrollHeight; }
+
+async function startGame() {
+    ensureAudio(); SFX.click();
+    const n = +$("player-count").value;
+    G.players = []; for (let i = 1; i <= n; i++) G.players.push({ name: $(`pn-${i}`).value.trim() || `玩家 ${i}`, hand: [] });
+    G.nOwls = +$("owl-count").value; MAX_SUN = +$("sun-len").value;
+    G.deck = buildDeck(); G.sun = 0; G.cur = 0; G.sel = null; G.over = false; G.busy = true;
+    G.owls = []; for (let i = 0; i < G.nOwls; i++) G.owls.push(NSTART - 1 - i);   // 1 號在起點1（最前面）
+    $("setup-screen").style.display = "none"; $("game").classList.add("on");
+    drawBoard(); renderSun(); renderPlayers(); renderOwls();
+    log(`🦉 任務：在天亮前把 <b>${G.nOwls}</b> 隻貓頭鷹送回巢！`);
+    speak("發牌囉！");
+    for (let r = 0; r < 3; r++) for (const p of G.players) { p.hand.push(G.deck.pop()); renderPlayers(p); SFX.deal(); await sleep(230); }
+    await sleep(300);
+    beginTurn();
+}
+
+/* ================= 版圖：等距螺旋 36 格 ================= */
+function computeTrack() {
+    const R0 = 345, GAP = 72, TURN = 1.5, A0 = 2.1, N = 3000, pts = [], cum = [0];
+    for (let i = 0; i <= N; i++) {
+        const k = i / N, th = A0 + k * TURN * 2 * Math.PI, r = R0 - GAP * TURN * k;
+        pts.push([CX + r * Math.cos(th), CY + r * Math.sin(th)]);
+        if (i) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    }
+    slotXY = []; let j = 0;
+    for (let s = 0; s < SLOTS; s++) {
+        const target = cum[N] * s / (SLOTS - 1);
+        while (j < N && cum[j + 1] < target) j++;
+        slotXY.push({ x: pts[j][0], y: pts[j][1] });
+    }
+}
+function rng(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
+function drawNest() {
+    const r = rng(7); let h = "";
+    // 外圈枝條
+    const browns = ["#6b4423", "#7d5230", "#8c5e36", "#5a381c", "#9b6b3f", "#4a2e16"];
+    for (let k = 0; k < 170; k++) {
+        const a = r() * Math.PI * 2, len = .35 + r() * .55, rad = 118 + r() * 50, rad2 = rad + (r() - .5) * 26;
+        const x1 = CX + rad * Math.cos(a), y1 = CY + rad * Math.sin(a), x2 = CX + rad2 * Math.cos(a + len), y2 = CY + rad2 * Math.sin(a + len);
+        const mr = (rad + rad2) / 2 + (r() - .3) * 14, mx = CX + mr * Math.cos(a + len / 2), my = CY + mr * Math.sin(a + len / 2);
+        h += `<path d="M${x1.toFixed(1)},${y1.toFixed(1)} Q${mx.toFixed(1)},${my.toFixed(1)} ${x2.toFixed(1)},${y2.toFixed(1)}" stroke="${browns[k % 6]}" stroke-width="${(3 + r() * 5).toFixed(1)}" fill="none" stroke-linecap="round"/>`;
+    }
+    // 突出的小枝
+    for (let k = 0; k < 22; k++) {
+        const a = r() * Math.PI * 2, r1 = 150 + r() * 12, r2 = r1 + 18 + r() * 22, d = (r() - .5) * .3;
+        h += `<path d="M${(CX + r1 * Math.cos(a)).toFixed(1)},${(CY + r1 * Math.sin(a)).toFixed(1)} L${(CX + r2 * Math.cos(a + d)).toFixed(1)},${(CY + r2 * Math.sin(a + d)).toFixed(1)}" stroke="#5a381c" stroke-width="3" stroke-linecap="round"/>`;
+    }
+    // 葉子
+    for (let k = 0; k < 9; k++) {
+        const a = (k / 9) * Math.PI * 2 + r() * .3, rad = 158, x = CX + rad * Math.cos(a), y = CY + rad * Math.sin(a), rot = a * 180 / Math.PI + 90;
+        h += `<g transform="translate(${x.toFixed(1)},${y.toFixed(1)}) rotate(${rot.toFixed(0)})"><ellipse rx="9" ry="20" fill="${k % 2 ? "#3f8f3a" : "#58a84a"}" stroke="#2c6b28" stroke-width="2"/><path d="M0,-18 L0,18" stroke="#2c6b28" stroke-width="1.5"/></g>`;
+    }
+    // 碗狀內部 + 柔軟稻草
+    h += `<circle cx="${CX}" cy="${CY}" r="120" fill="url(#gBowl)" stroke="#7d5230" stroke-width="6"/>`;
+    for (let k = 0; k < 60; k++) {
+        const a = r() * Math.PI * 2, rad = 30 + r() * 82, len = .3 + r() * .5;
+        h += `<path d="M${(CX + rad * Math.cos(a)).toFixed(1)},${(CY + rad * Math.sin(a)).toFixed(1)} A${rad.toFixed(1)},${rad.toFixed(1)} 0 0 1 ${(CX + rad * Math.cos(a + len)).toFixed(1)},${(CY + rad * Math.sin(a + len)).toFixed(1)}" stroke="#c9a46a" stroke-width="${(1.5 + r() * 2).toFixed(1)}" fill="none" opacity="${(.25 + r() * .35).toFixed(2)}" stroke-linecap="round"/>`;
+    }
+    // 內緣亮邊、羽毛
+    h += `<circle cx="${CX}" cy="${CY}" r="114" fill="none" stroke="#b07a42" stroke-width="3" stroke-dasharray="14 9" opacity=".7"/>`;
+    h += `<g transform="translate(${CX + 70},${CY - 72}) rotate(35)" opacity=".85"><path d="M0,-18 C10,-8 10,10 0,18 C-10,10 -10,-8 0,-18Z" fill="#f2efe6"/><path d="M0,-18 L0,22" stroke="#bbb" stroke-width="1.5"/></g>`;
+    // 家的座位
+    nestSeats().forEach((p, i) => { h += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="27" fill="rgba(0,0,0,.25)" stroke="#e8c374" stroke-width="2" stroke-dasharray="4 4"/>`; });
+    h += `<text x="${CX}" y="${CY + 8}" font-size="22" font-weight="900" fill="#ffdd57" text-anchor="middle" opacity=".55">🏠 家</text>`;
+    $("layer-nest").innerHTML = h;
+}
+function nestSeats() {
+    const n = G.nOwls, out = [];
+    for (let i = 0; i < n; i++) { const a = i * 2 * Math.PI / n - Math.PI / 2, rr = n <= 3 ? 52 : 66; out.push({ x: CX + rr * Math.cos(a), y: CY + rr * Math.sin(a) }); }
+    return out;
+}
+function drawBoard() {
+    computeTrack();
+    let d = `M${slotXY[0].x},${slotXY[0].y}`; slotXY.forEach(p => d += ` L${p.x.toFixed(1)},${p.y.toFixed(1)}`);
+    $("layer-path").innerHTML = `<path d="${d}" fill="none" stroke="#3a2a16" stroke-width="78" stroke-linecap="round" stroke-linejoin="round" opacity=".75"/>
+        <path d="${d}" fill="none" stroke="#6b5233" stroke-width="66" stroke-linecap="round" stroke-linejoin="round" opacity=".55"/>
+        <path d="${d}" fill="none" stroke="#fff" stroke-width="3" stroke-dasharray="8 10" opacity=".25"/>`;
+    drawNest();
+    let s = "";
+    slotXY.forEach((p, i) => {
+        s += `<g class="slot" onclick="slotClick(${i})"><circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="31" fill="${HEX[track[i]]}" stroke="#111" stroke-width="3" filter="url(#shadow)"/>
+            <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="29" fill="url(#gSlot)"/>
+            ${i < NSTART
+                ? `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="26" fill="none" stroke="#fff" stroke-width="3" stroke-dasharray="5 4"/>
+                   <text x="${p.x.toFixed(1)}" y="${(p.y - 2).toFixed(1)}" font-size="12" font-weight="900" fill="#000" text-anchor="middle" opacity=".7">起點</text>
+                   <text x="${p.x.toFixed(1)}" y="${(p.y + 15).toFixed(1)}" font-size="17" font-weight="900" fill="#000" text-anchor="middle" opacity=".7">${NSTART - i}</text>`
+                : `<text x="${p.x.toFixed(1)}" y="${(p.y + 6).toFixed(1)}" font-size="17" font-weight="900" fill="#000" text-anchor="middle" opacity=".55">${i - NSTART + 1}</text>`}</g>`;
+    });
+    $("layer-slots").innerHTML = s;
+}
+
+/* ================= 貓頭鷹 ================= */
+const OWL_PAL = [
+    { w: "#3498db", b: "#ffffff", f: "#f39c12" }, { w: "#d81b60", b: "#fff4e8", f: "#f1c40f" }, { w: "#10ac84", b: "#eeeae0", f: "#ff9f43" },
+    { w: "#8e44ad", b: "#ffffff", f: "#00d2d3" }, { w: "#34495e", b: "#f5cd79", f: "#e66767" }, { w: "#1e3fd8", b: "#ffffff", f: "#ff7675" }];
+function owlSVG(i) {
+    const p = OWL_PAL[i % 6];
+    return `<circle class="ring" r="44" fill="none" stroke="#ffdd57" stroke-width="5" stroke-dasharray="8 6"/>
+    <g transform="scale(1.5)"><g class="inner">
+        <ellipse cx="0" cy="22" rx="18" ry="4" fill="#000" opacity=".35"/>
+        <path d="M-16,-12 L-9,-24 L0,-15 L9,-24 L16,-12 L20,5 L14,20 L-14,20 L-20,5 Z" fill="${p.w}" stroke="#000" stroke-width="2.5"/>
+        <ellipse cx="0" cy="3" rx="14" ry="16" fill="${p.b}" stroke="#000" stroke-width="2"/>
+        <path d="M-14,-4 Q-24,5 -13,15" fill="${p.w}" stroke="#000" stroke-width="2.3"/>
+        <path d="M14,-4 Q24,5 13,15" fill="${p.w}" stroke="#000" stroke-width="2.3"/>
+        <circle cx="-6" cy="-5" r="6.5" fill="#fff" stroke="#000" stroke-width="1.6"/><circle cx="-6" cy="-5" r="3.7" fill="#000"/><circle cx="-4.4" cy="-6.6" r="1.4" fill="#fff"/>
+        <circle cx="6" cy="-5" r="6.5" fill="#fff" stroke="#000" stroke-width="1.6"/><circle cx="6" cy="-5" r="3.7" fill="#000"/><circle cx="7.6" cy="-6.6" r="1.4" fill="#fff"/>
+        <polygon points="0,3 -3.5,-1 3.5,-1" fill="${p.f}" stroke="#000" stroke-width=".8"/>
+        <path d="M-4,6 Q-2,9 0,6 M0,6 Q2,9 4,6 M-3,10 Q0,13 3,10" fill="none" stroke="#7f8c8d" stroke-width="1.4"/>
+        <circle cx="-6" cy="19" r="3" fill="#e67e22"/><circle cx="6" cy="19" r="3" fill="#e67e22"/>
+        <circle cx="15" cy="-16" r="8.5" fill="#ffdd57" stroke="#000" stroke-width="1.6"/>
+        <text x="15" y="-12.5" font-size="11" font-weight="900" fill="#000" text-anchor="middle">${i + 1}</text>
+    </g></g>`;
+}
+function owlXY(i) { const p = G.owls[i]; return p === "nest" ? nestSeats()[i] : slotXY[p]; }
+function renderOwls() {
+    const canMove = G.sel !== null && cardOf(G.sel) !== "sun";
+    let h = "";
+    G.owls.forEach((p, i) => {
+        const q = owlXY(i);
+        h += `<g class="owl ${canMove && p !== "nest" ? "can" : ""}" id="owl-${i}" transform="translate(${q.x.toFixed(1)},${q.y.toFixed(1)})"
+            onclick="owlClick(${i})" onmouseenter="previewOwl(${i})" onmouseleave="clearPreview(false)">${owlSVG(i)}</g>`;
+    });
+    $("layer-owls").innerHTML = h;
+}
+function cardOf(idx) { return G.players[G.cur].hand[idx]; }
+
+/* 規則：移動路徑（與二版相同，已核對原版規則） */
+function planMove(i, color) {
+    const path = [], jumps = [];
+    let pos = G.owls[i] + 1;
+    while (pos < SLOTS) {
+        path.push(pos);
+        if (track[pos] === color) {
+            const taken = G.owls.some((o, k) => k !== i && o === pos);
+            if (!taken) return { path, jumps, dest: pos };
+            jumps.push(pos);
+        }
+        pos++;
+    }
+    path.push("nest");
+    return { path, jumps, dest: "nest" };
+}
+function previewOwl(i, sticky = false) {
+    if (aimed !== null && !sticky) return;         // 已經點選一隻，就固定顯示那隻
+    clearPreview(sticky);
+    if (G.sel === null || G.busy || G.owls[i] === "nest") return;
+    const c = cardOf(G.sel); if (c === "sun") return;
+    const m = planMove(i, c), q = m.dest === "nest" ? nestSeats()[i] : slotXY[m.dest], o = owlXY(i);
+    let h = `<circle class="preview" cx="${q.x}" cy="${q.y}" r="42" fill="rgba(255,255,255,.15)" stroke="#fff" stroke-width="7" stroke-dasharray="10 7" style="cursor:pointer" onclick="owlClick(${i})"/>
+        <text class="preview" x="${q.x}" y="${q.y - 52}" font-size="24" font-weight="900" fill="#fff" stroke="#000" stroke-width="4" paint-order="stroke" text-anchor="middle">${m.dest === "nest" ? "回家！" : "會停這裡"}</text>`;
+    if (sticky) h += `<circle cx="${o.x}" cy="${o.y}" r="50" fill="none" stroke="#4cd137" stroke-width="7"/>
+        <text x="${o.x}" y="${o.y + 72}" font-size="22" font-weight="900" fill="#4cd137" stroke="#000" stroke-width="4" paint-order="stroke" text-anchor="middle">再點一次起飛 ✈</text>`;
+    $("layer-preview").innerHTML = h;
+    if (sticky) hint(`🎯 ${i + 1} 號貓頭鷹`, "白框是牠會停的地方。<b>再點一次這隻貓頭鷹（或點白框）就起飛</b>；想換別隻，直接點別隻。");
+}
+function clearPreview(force = true) { if (force || aimed === null) $("layer-preview").innerHTML = ""; }
+
+/* ================= 太陽直條 ================= */
+function renderSun(moved = false) {
+    let h = "";
+    for (let i = 0; i <= MAX_SUN; i++) {
+        let cls = "sun-cell", inner = "";
+        if (i === 0) cls += " start"; if (i === MAX_SUN) cls += " end";
+        if (G.sun === i) inner = `<div class="sun-token ${moved ? "moved" : ""}">☀️</div>`;
+        else if (i === MAX_SUN) inner = "🔥"; else if (i === MAX_SUN - 1) inner = "🥵"; else if (i >= MAX_SUN - 3) inner = "☀️"; else if (i >= MAX_SUN - 5) inner = "🌅"; else if (i === 0) inner = "🌑";
+        h += `<div class="${cls}"><span class="n">${i}</span>${inner}</div>`;
+    }
+    $("sun-track").innerHTML = h;
+    $("sun-left").innerHTML = G.sun >= MAX_SUN ? "天亮了！" : `還剩<br>${MAX_SUN - G.sun} 格`;
+    const b = document.body; b.className = "";
+    if (G.sun >= MAX_SUN) b.classList.add("st-fire"); else if (G.sun === MAX_SUN - 1) b.classList.add("st-hot"); else if (G.sun >= MAX_SUN - 3) b.classList.add("st-day"); else if (G.sun >= MAX_SUN - 5) b.classList.add("st-dawn");
+}
+
+/* ================= 玩家手牌 ================= */
+function cardHTML(c, pIdx, cIdx, extra = "") {
+    const sel = pIdx === G.cur && G.sel === cIdx ? " sel" : "";
+    const must = pIdx === G.cur && c === "sun" && !G.busy ? " must" : "";
+    return c === "sun" ? `<div class="gcard sun${sel}${must}${extra}" onclick="selectCard(${pIdx},${cIdx})">☀️</div>`
+        : `<div class="gcard${sel}${extra}" onclick="selectCard(${pIdx},${cIdx})"><div class="dot" style="background:${HEX[c]}"></div></div>`;
+}
+function renderPlayers(newCardFor = null) {
+    $("players").classList.toggle("many", G.players.length > 4);
+    $("players").innerHTML = G.players.map((p, i) => `<div class="pbox ${i === G.cur && !G.over ? "active" : ""}" id="pbox-${i}">
+        <div class="pname"><span>👤 ${p.name}</span><span class="now">輪到你</span></div>
+        <div class="hand">${p.hand.map((c, k) => cardHTML(c, i, k, newCardFor === p && k === p.hand.length - 1 ? " dealt" : "")).join("")}</div></div>`).join("");
+    $("deck-count").textContent = G.deck.length;
+}
+
+/* ================= 回合 ================= */
+async function showBanner(html, color = "#2f8f3a", ms = 1600) {
+    const w = $("banner"), b = $("banner-box"); b.innerHTML = html; b.style.setProperty("--bc", color); w.style.setProperty("--bd", ms + "ms");
+    w.classList.remove("show"); void w.offsetWidth; w.classList.add("show"); await sleep(ms); w.classList.remove("show");
+}
+let toastT = null;
+function toast(t) { const e = $("toast"); e.textContent = t; e.classList.remove("on"); void e.offsetWidth; e.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(() => e.classList.remove("on"), 2400); }
+function hint(name, h) { $("turn-name").textContent = name; $("turn-hint").innerHTML = h; }
+
+async function beginTurn() {
+    if (G.over) return;
+    const p = G.players[G.cur];
+    G.sel = null; G.busy = true; aimed = null; clearPreview();
+    if (!p.hand.length) {
+        if (G.players.every(q => !q.hand.length)) return endGame(false, "牌全部用完了，貓頭鷹還沒全部回家……再挑戰一次吧！");
+        log(`⏭️ ${p.name} 沒有牌了，換下一位`); G.cur = (G.cur + 1) % G.players.length; return beginTurn();
+    }
+    renderPlayers(); renderOwls();
+    SFX.turn();
+    const hasSun = p.hand.includes("sun");
+    hint(`🎲 輪到 ${p.name}`, hasSun ? "⚠️ 你有<b>太陽卡</b>，一定要先打出太陽卡！點那張閃紅光的太陽卡。" : "① 點一張彩色卡　② 點一隻閃黃圈的貓頭鷹讓牠飛");
+    speak(hasSun ? `輪到${p.name}，你有太陽卡，要先打出太陽卡` : `輪到${p.name}，請選一張彩色卡`);
+    await showBanner(`🦉 輪到 ${p.name}！${hasSun ? "<small>☀️ 先打出太陽卡！</small>" : ""}`, hasSun ? "#e67e22" : "#2f8f3a", 1500);
+    G.busy = false; renderPlayers();
+}
+function selectCard(pIdx, cIdx) {
+    if (G.over || G.busy) return;
+    ensureAudio();
+    if (pIdx !== G.cur) { SFX.bad(); toast(`還沒輪到 ${G.players[pIdx].name} 喔！`); speak("還沒輪到你喔"); return; }
+    const p = G.players[pIdx], c = p.hand[cIdx];
+    if (p.hand.includes("sun") && c !== "sun") { SFX.bad(); toast("☀️ 有太陽卡要先打出太陽卡！"); speak("有太陽卡，要先打出太陽卡喔"); return; }
+    G.sel = cIdx; aimed = null; clearPreview();
+    if (c === "sun") return playSun();
+    SFX.select(); speak(`${CNAME[c]}，請選一隻貓頭鷹`);
+    renderPlayers(); renderOwls();
+    hint(`🎲 ${p.name}：${CNAME[c]}卡`, "👉 點一隻閃黃圈的貓頭鷹（滑鼠移上去會看到牠會停哪裡）");
+}
+async function playSun() {
+    G.busy = true;
+    const p = G.players[G.cur];
+    p.hand.splice(G.sel, 1); G.sel = null; renderPlayers();
+    G.sun++; renderSun(true); SFX.sun();
+    log(`☀️ ${p.name} 打出太陽卡，太陽前進到第 ${G.sun} 格`);
+    if (G.sun >= MAX_SUN) { await sleep(800); return endGame(false, "🔥 太陽完全升起了！還有貓頭鷹沒回到家……大家再挑戰一次吧！"); }
+    const left = MAX_SUN - G.sun;
+    if (left <= 2) { SFX.warn(); showBanner(`☀️ 太陽前進！<small>⚠️ 只剩 ${left} 格就天亮！</small>`, "#d35400", 2200); await speakAsync(`${p.name}打出太陽卡，太陽前進一格！危險！只剩${CN[left]}格就天亮了！`, 2200); }
+    else { showBanner(`☀️ 太陽前進一格！<small>還剩 ${left} 格</small>`, "#e67e22", 1900); await speakAsync(`${p.name}打出太陽卡，太陽前進一格，還剩${CN[left]}格就天亮`, 1900); }
+    await drawCard(p);
+    nextTurn();
+}
+function slotClick(s) { const i = G.owls.indexOf(s); if (i !== -1) owlClick(i); }
+let aimed = null;   // 第一次點：先看會停哪裡；再點一次（或點白框目的地）才起飛
+async function owlClick(i) {
+    if (G.over || G.busy) return;
+    ensureAudio();
+    if (G.sel === null) { SFX.bad(); toast("先點一張彩色卡喔！"); speak("先選一張彩色卡喔"); return; }
+    const c = cardOf(G.sel); if (c === "sun") return;
+    if (G.owls[i] === "nest") { SFX.bad(); toast("這隻已經回家了，選別隻！"); return; }
+    if (aimed !== i) {
+        aimed = i; previewOwl(i, true); SFX.select();
+        const m0 = planMove(i, c);
+        speak(m0.dest === "nest" ? `${i + 1}號會直接飛回家！再點一次就起飛` : `${i + 1}號會停在${slotName(m0.dest)}，再點一次就起飛`);
+        return;
+    }
+    aimed = null;
+    G.busy = true; clearPreview();
+    const p = G.players[G.cur], m = planMove(i, c);
+    document.querySelectorAll(".owl.can").forEach(o => o.classList.remove("can"));
+    await flyOwl(i, m);
+    G.owls[i] = m.dest;
+    p.hand.splice(G.sel, 1); G.sel = null;
+    renderOwls(); renderPlayers();
+    if (m.dest === "nest") {
+        SFX.home(); burst(nestSeats()[i], ["⭐", "✨", "🌟", "🍃"], 18);
+        setTimeout(startMom, 2500);
+        const home = G.owls.filter(o => o === "nest").length;
+        const sp = speakAsync(`貓頭鷹${i + 1}號回家了！已經${CN[home]}隻回家`, 1800);
+        log(`🏠 ${p.name} 把 ${i + 1} 號貓頭鷹送回家！`);
+        await showBanner(`🏠 ${i + 1} 號貓頭鷹回家了！<small>已回家 ${home} / ${G.nOwls}</small>`, "#8e44ad", 1800);
+        await sp;
+    } else { SFX.land(); log(`🦉 ${i + 1} 號貓頭鷹飛到${slotName(m.dest)}（${CNAME[c]}）`); }
+    if (G.owls.every(o => o === "nest")) return endGame(true, "🏆 太棒了！在天亮之前，所有貓頭鷹都平安回家了！大家合作成功！");
+    await drawCard(p);
+    nextTurn();
+}
+function flyOwl(i, m) {
+    return new Promise(async res => {
+        const g = $(`owl-${i}`); let from = owlXY(i);
+        g.parentNode.appendChild(g);       // 移到最上層
+        for (const s of m.path) {
+            const to = s === "nest" ? nestSeats()[i] : slotXY[s];
+            const isJump = m.jumps.includes(s);
+            SFX.step();
+            await new Promise(r2 => {
+                const t0 = performance.now(), D = isJump ? 340 : 200, H = isJump ? 70 : 26;
+                (function f(t) {
+                    const k = Math.min(1, (t - t0) / D), x = from.x + (to.x - from.x) * k, y = from.y + (to.y - from.y) * k - Math.sin(Math.PI * k) * H;
+                    g.setAttribute("transform", `translate(${x.toFixed(1)},${y.toFixed(1)}) scale(${1 + Math.sin(Math.PI * k) * (isJump ? .25 : .08)})`);
+                    k < 1 ? requestAnimationFrame(f) : r2();
+                })(t0);
+            });
+            if (isJump) { SFX.hoot(); popText(to, "HOOT! 飛越！", "#ffdd57"); burst(to, ["🪶", "✨"], 6); }
+            from = to;
+        }
+        res();
+    });
+}
+async function drawCard(p) {
+    if (!G.deck.length) { log("ℹ️ 牌堆沒牌了，用手上的牌繼續努力！"); return; }
+    p.hand.push(G.deck.pop()); SFX.deal(); renderPlayers(p); await sleep(650);
+}
+function nextTurn() { G.cur = (G.cur + 1) % G.players.length; beginTurn(); }
+
+/* ================= 特效 ================= */
+function popText(p, t, color) {
+    const e = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    e.setAttribute("x", p.x); e.setAttribute("y", p.y - 40); e.setAttribute("text-anchor", "middle");
+    e.setAttribute("font-size", "34"); e.setAttribute("font-weight", "900"); e.setAttribute("fill", color);
+    e.setAttribute("stroke", "#000"); e.setAttribute("stroke-width", "5"); e.setAttribute("paint-order", "stroke");
+    e.textContent = t; $("layer-fx").appendChild(e);
+    e.animate([{ transform: "translateY(10px)", opacity: 0 }, { transform: "translateY(-10px)", opacity: 1, offset: .25 }, { transform: "translateY(-60px)", opacity: 0 }], { duration: 1300 }).onfinish = () => e.remove();
+}
+function burst(p, emojis, n) {
+    for (let k = 0; k < n; k++) {
+        const e = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        e.setAttribute("x", p.x); e.setAttribute("y", p.y); e.setAttribute("font-size", 20 + Math.random() * 16); e.setAttribute("text-anchor", "middle");
+        e.textContent = emojis[k % emojis.length]; $("layer-fx").appendChild(e);
+        const a = Math.random() * Math.PI * 2, d = 60 + Math.random() * 90;
+        e.animate([{ transform: "translate(0,0)", opacity: 1 }, { transform: `translate(${Math.cos(a) * d}px,${Math.sin(a) * d}px)`, opacity: 0 }], { duration: 900 + Math.random() * 500, easing: "ease-out" }).onfinish = () => e.remove();
+    }
+}
+function endGame(win, msg) {
+    G.over = true; G.busy = true; renderPlayers();
+    $("end-title").textContent = win ? "🏆 合作成功！" : "🌅 天亮了！挑戰失敗";
+    $("end-title").style.color = win ? "#4cd137" : "#ff7675";
+    $("end-body").textContent = msg;
+    if (win) {
+        SFX.win(); speak("太棒了！所有貓頭鷹都回家了！大家合作成功！");
+        const cs = ["#f1c40f", "#2e86de", "#e74c3c", "#2ecc71", "#9b59b6", "#e67e22"];
+        for (let i = 0; i < 140; i++) { const c = document.createElement("div"); c.className = "confetti"; c.style.left = Math.random() * 100 + "vw"; c.style.background = cs[i % 6]; document.body.appendChild(c);
+            c.animate([{ transform: "translateY(0) rotate(0)" }, { transform: `translateY(${innerHeight + 40}px) rotate(${Math.random() * 1080}deg)` }], { duration: 2500 + Math.random() * 2500, delay: Math.random() * 1500, fill: "forwards" }).onfinish = () => c.remove(); }
+    } else {
+        G.sun = MAX_SUN; renderSun(); $("fire").style.display = "block"; SFX.lose(); speak("天亮了！挑戰失敗，再試一次吧！");
+    }
+    setTimeout(() => $("end-modal").style.display = "flex", 1500);
+}
+
+/* =====================================================================
+   🦉 貓頭鷹媽媽：第一隻貓頭鷹回家後，從右下角飛出來
+   1 飛到最後面的孩子旁說加油   2 飛去擋太陽   3 到巢穴親吻回家的孩子
+   4 從起點沿路線飛到最後面孩子的後方喊加油   5 對太陽搧翅膀   6 米字型飛過整個畫面後喘氣
+   7 學啄木鳥啄外圈的圓圈（叮叮叮）   8 對孩子搧翅膀想把他吹回家   ＊可以用滑鼠／手指拎起來
+   ===================================================================== */
+const MOM = { el: null, active: false, run: 0, x: 0, y: 0, W: 130, H: 146, drag: false, last: -1, n: 0 };
+function momSVG() {
+    const F = "#8e6bb5", S = "#5b3f80", B = "#f3e6d2", K = "#ff7eb6", KS = "#c9407a", E = "#2b1b3a";
+    const headband = (cx, cy, k = 1) => `<path d="M${cx - 30 * k},${cy - 18 * k} Q${cx},${cy - 44 * k} ${cx + 30 * k},${cy - 18 * k}" stroke="#e53950" stroke-width="${7 * k}" fill="none" stroke-linecap="round"/>
+        <g transform="translate(${cx - 20 * k},${cy - 32 * k}) scale(${k})">${[0, 72, 144, 216, 288].map(a => `<ellipse rx="6" ry="10" fill="#ffd1e8" stroke="${KS}" stroke-width="1.5" transform="rotate(${a}) translate(0,-8)"/>`).join("")}<circle r="6" fill="#ffd54f" stroke="#e6a100"/></g>
+        <path d="M${cx + 18 * k},${cy - 34 * k} l${10 * k},${-8 * k} l${2 * k},${12 * k} z M${cx + 18 * k},${cy - 34 * k} l${12 * k},${4 * k} l${-6 * k},${9 * k} z" fill="#e53950"/>`;
+    return `<svg viewBox="-80 -95 160 180">
+    <g class="front">
+        <g class="wl"><path d="M-30,-6 C-74,-2 -80,40 -56,58 C-50,42 -40,28 -28,22 Z" fill="${F}" stroke="${S}" stroke-width="3"/><path d="M-60,30 L-44,22 M-62,42 L-46,30" stroke="${S}" stroke-width="2"/></g>
+        <g class="wr"><path d="M30,-6 C74,-2 80,40 56,58 C50,42 40,28 28,22 Z" fill="${F}" stroke="${S}" stroke-width="3"/><path d="M60,30 L44,22 M62,42 L46,30" stroke="${S}" stroke-width="2"/></g>
+        <g class="bodyG">
+            <ellipse cx="0" cy="12" rx="38" ry="44" fill="${F}" stroke="${S}" stroke-width="3"/>
+            <ellipse cx="0" cy="16" rx="25" ry="30" fill="${B}"/>
+            <path d="M-10,4 l5,5 l5,-5 M0,4 l5,5 l5,-5 M-15,16 l5,5 l5,-5 M-5,16 l5,5 l5,-5 M5,16 l5,5 l5,-5" stroke="#cdb79a" stroke-width="2" fill="none"/>
+            <path d="M-36,30 L36,30 L52,64 Q42,72 31,64 Q21,72 10,64 Q0,72 -10,64 Q-21,72 -31,64 Q-42,72 -52,64 Z" fill="${K}" stroke="${KS}" stroke-width="3" stroke-linejoin="round"/>
+            <g fill="#fff" opacity=".85"><circle cx="-26" cy="48" r="3"/><circle cx="-8" cy="54" r="3"/><circle cx="10" cy="46" r="3"/><circle cx="28" cy="54" r="3"/><circle cx="0" cy="40" r="2.5"/></g>
+            <rect x="-37" y="26" width="74" height="8" rx="4" fill="${KS}"/>
+            <path d="M-8,30 l-10,-7 l0,14 z M8,30 l10,-7 l0,14 z" fill="#ffd1e8" stroke="${KS}" stroke-width="1.5"/><circle cx="0" cy="30" r="4" fill="#ffd1e8" stroke="${KS}"/>
+            <path d="M-14,66 l-6,10 M-14,66 l0,11 M-14,66 l6,10 M14,66 l-6,10 M14,66 l0,11 M14,66 l6,10" stroke="#f39c12" stroke-width="4" stroke-linecap="round"/>
+        </g>
+        <path d="M-30,-56 L-34,-86 L-12,-66 Z M30,-56 L34,-86 L12,-66 Z" fill="${F}" stroke="${S}" stroke-width="3" stroke-linejoin="round"/>
+        <circle cx="0" cy="-40" r="35" fill="${F}" stroke="${S}" stroke-width="3"/>
+        ${headband(0, -40)}
+        <circle cx="-14" cy="-40" r="16" fill="#e9dcf3"/><circle cx="14" cy="-40" r="16" fill="#e9dcf3"/>
+        <g class="eN"><circle cx="-14" cy="-41" r="11" fill="#fff" stroke="${E}" stroke-width="2"/><circle cx="-12" cy="-40" r="6.5" fill="${E}"/><circle cx="-10" cy="-43" r="2.3" fill="#fff"/>
+            <circle cx="14" cy="-41" r="11" fill="#fff" stroke="${E}" stroke-width="2"/><circle cx="12" cy="-40" r="6.5" fill="${E}"/><circle cx="14" cy="-43" r="2.3" fill="#fff"/>
+            <path d="M-24,-49 l-5,-5 M-21,-52 l-3,-6 M24,-49 l5,-5 M21,-52 l3,-6" stroke="${E}" stroke-width="2.2" stroke-linecap="round"/></g>
+        <g class="eC" stroke="${E}" stroke-width="3" fill="none" stroke-linecap="round"><path d="M-23,-40 Q-14,-33 -5,-40"/><path d="M5,-40 Q14,-33 23,-40"/><path d="M-24,-40 l-5,-3 M24,-40 l5,-3"/></g>
+        <g class="eH" stroke="${E}" stroke-width="3" fill="none" stroke-linecap="round"><path d="M-23,-38 Q-14,-48 -5,-38"/><path d="M5,-38 Q14,-48 23,-38"/></g>
+        <ellipse cx="-24" cy="-28" rx="6" ry="3.5" fill="#ff9ec8" opacity=".8"/><ellipse cx="24" cy="-28" rx="6" ry="3.5" fill="#ff9ec8" opacity=".8"/>
+        <path d="M-6,-32 L6,-32 L0,-20 Z" fill="#f39c12" stroke="#b86e00" stroke-width="1.5"/>
+        <ellipse class="mO" cx="0" cy="-17" rx="5" ry="6" fill="#7a2d3a"/>
+        <g class="sweat"><path d="M30,-62 q5,8 0,12 q-5,-4 0,-12z" fill="#7fd3ff"/><path d="M-34,-56 q5,8 0,12 q-5,-4 0,-12z" fill="#7fd3ff"/></g>
+    </g>
+    <g class="side">
+        <path d="M-10,0 C-46,4 -50,40 -30,52 C-22,36 -14,26 -2,20 Z" fill="${F}" stroke="${S}" stroke-width="3"/>
+        <ellipse cx="-4" cy="14" rx="34" ry="42" fill="${F}" stroke="${S}" stroke-width="3"/>
+        <ellipse cx="10" cy="18" rx="16" ry="28" fill="${B}"/>
+        <path d="M-36,32 L30,32 L42,64 Q32,72 22,64 Q12,72 2,64 Q-8,72 -18,64 Q-28,72 -40,64 Z" fill="${K}" stroke="${KS}" stroke-width="3" stroke-linejoin="round"/>
+        <rect x="-37" y="28" width="68" height="8" rx="4" fill="${KS}"/>
+        <path d="M-6,66 l8,10 M4,66 l8,10" stroke="#f39c12" stroke-width="4" stroke-linecap="round"/>
+        <g class="shead">
+            <path d="M-6,-58 L-12,-86 L8,-64 Z" fill="${F}" stroke="${S}" stroke-width="3"/>
+            <circle cx="4" cy="-38" r="31" fill="${F}" stroke="${S}" stroke-width="3"/>
+            ${headband(2, -38, .9)}
+            <circle cx="18" cy="-40" r="14" fill="#e9dcf3"/>
+            <circle cx="20" cy="-41" r="9" fill="#fff" stroke="${E}" stroke-width="2"/><circle cx="23" cy="-40" r="5" fill="${E}"/><circle cx="24" cy="-43" r="1.8" fill="#fff"/>
+            <path d="M30,-36 L58,-30 L30,-24 Z" fill="#f39c12" stroke="#b86e00" stroke-width="1.5"/>
+            <ellipse cx="12" cy="-26" rx="5" ry="3" fill="#ff9ec8"/>
+        </g>
+    </g></svg>`;
+}
+const MSFX = {
+    coo()  { tone(560, .22, { vol: .35, slide: 500, vib: 10 }); tone(520, .4, { vol: .35, slide: 440, vib: 12, delay: .26 }); },
+    kiss() { tone(1400, .08, { type: "triangle", vol: .35, slide: 2400 }); noise(.05, { type: "highpass", from: 4000, to: 4000, vol: .25, delay: .05 }); },
+    wind() { noise(.7, { from: 400, to: 1800, q: 1.5, vol: .5 }); },
+    flap() { noise(.08, { type: "lowpass", from: 900, to: 400, vol: .35 }); },
+    ding() { tone(1760, .25, { type: "triangle", vol: .35 }); tone(2640, .18, { vol: .15 }); noise(.03, { type: "highpass", from: 3000, to: 3000, vol: .3 }); },
+    pant() { noise(.25, { from: 900, to: 500, q: 1, vol: .35 }); },
+    oops() { tone(700, .15, { type: "triangle", vol: .3, slide: 1300 }); tone(1300, .3, { type: "triangle", vol: .3, slide: 600, delay: .15 }); }
+};
+function momSpeak(t) {
+    if (!soundOn || !("speechSynthesis" in window) || speechSynthesis.speaking) return;
+    try { const u = new SpeechSynthesisUtterance(t); u.lang = "zh-TW"; if (zhVoice) u.voice = zhVoice; u.rate = 1.05; u.pitch = 1.6; speechSynthesis.speak(u); } catch (e) {}
+}
+const mAlive = r => r === MOM.run && MOM.active && !MOM.drag && !G.over;
+function mCls(add, rm) { rm.forEach(c => MOM.el.classList.remove(c)); add.forEach(c => c && MOM.el.classList.add(c)); }
+function mAct(a = "") { mCls(a.split(" "), ["flap", "fan", "spread", "pant", "peck", "hover", "drag", "side-view"]); }
+function mFace(f = "") { mCls(f.split(" "), ["e-closed", "e-happy", "m-open"]); }
+function mPlace(x, y) { MOM.x = x; MOM.y = y; MOM.el.style.left = (x - MOM.W / 2) + "px"; MOM.el.style.top = (y - MOM.H / 2) + "px"; if (MOM.el.querySelector(".bub.on")) mBubPos(); }
+function mDir(d) { MOM.el.style.setProperty("--fx", d < 0 ? -1 : 1); }
+let mBubT = null;
+function mBubPos() {
+    const b = MOM.el.querySelector(".bub"); b.classList.remove("side", "sideL");
+    if (MOM.y - MOM.H / 2 - b.offsetHeight - 20 < 0) b.classList.add(MOM.x < innerWidth / 2 ? "side" : "sideL");
+    else if (MOM.x - b.offsetWidth / 2 < 6) b.classList.add("side");
+    else if (MOM.x + b.offsetWidth / 2 > innerWidth - 6) b.classList.add("sideL");
+}
+function mSay(t, ms = 2200) { const b = MOM.el.querySelector(".bub"); b.textContent = t; mBubPos(); b.classList.add("on"); clearTimeout(mBubT); mBubT = setTimeout(() => b.classList.remove("on"), ms); }
+async function mWait(ms, r) { const e = performance.now() + ms; while (performance.now() < e) { if (!mAlive(r)) return false; await sleep(100); } return true; }
+function mFly(x, y, r, speed = 520) {
+    return new Promise(res => {
+        if (!mAlive(r)) return res(false);
+        mAct("flap"); if (Math.abs(x - MOM.x) > 4) mDir(x - MOM.x);
+        let last = performance.now(), ft = 0;
+        (function f(t) {
+            if (!mAlive(r)) return res(false);
+            const dt = (t - last) / 1000; last = t; ft += dt;
+            if (ft > .32) { ft = 0; MSFX.flap(); }
+            const dx = x - MOM.x, dy = y - MOM.y, d = Math.hypot(dx, dy), m = speed * dt;
+            if (d <= m) { mPlace(x, y); mAct("hover"); return res(true); }
+            mPlace(MOM.x + dx / d * m, MOM.y + dy / d * m + Math.sin(t / 90) * 1.5);
+            requestAnimationFrame(f);
+        })(last);
+    });
+}
+function svgToScreen(p) { const sv = $("board"), pt = sv.createSVGPoint(); pt.x = p.x; pt.y = p.y; const q = pt.matrixTransform(sv.getScreenCTM()); return { x: q.x, y: q.y }; }
+function rearOwl() { let best = -1; G.owls.forEach((o, i) => { if (o !== "nest" && (best < 0 || o < G.owls[best])) best = i; }); return best; }
+function sunXY() { const t = document.querySelector(".sun-token").getBoundingClientRect(); return { x: t.left + t.width / 2, y: t.top + t.height / 2 }; }
+function fxEmoji(x, y, list, n, dist = 90) {
+    for (let k = 0; k < n; k++) {
+        const e = document.createElement("div"); e.className = "momfx"; e.textContent = list[k % list.length];
+        e.style.left = x + "px"; e.style.top = y + "px"; e.style.fontSize = (22 + Math.random() * 16) + "px"; document.body.appendChild(e);
+        const a = -Math.PI / 2 + (Math.random() - .5) * 2.4, d = dist * (.5 + Math.random() * .7);
+        e.animate([{ transform: "translate(-50%,-50%) scale(.4)", opacity: 1 }, { transform: `translate(calc(-50% + ${Math.cos(a) * d}px),calc(-50% + ${Math.sin(a) * d}px)) scale(1.1)`, opacity: 0 }],
+            { duration: 1100 + Math.random() * 500, easing: "ease-out" }).onfinish = () => e.remove();
+    }
+}
+function windTo(x1, y1, x2, y2, n = 7) {
+    const ang = Math.atan2(y2 - y1, x2 - x1), len = Math.hypot(x2 - x1, y2 - y1);
+    for (let k = 0; k < n; k++) setTimeout(() => {
+        const w = document.createElement("div"); w.className = "wind";
+        const off = (Math.random() - .5) * 70;
+        w.style.left = (x1 - Math.sin(ang) * off) + "px"; w.style.top = (y1 + Math.cos(ang) * off) + "px";
+        w.style.width = (50 + Math.random() * 50) + "px"; w.style.transform = `rotate(${ang}rad)`;
+        document.body.appendChild(w);
+        w.animate([{ transform: `rotate(${ang}rad) translateX(0)`, opacity: 0 }, { opacity: 1, offset: .2 }, { transform: `rotate(${ang}rad) translateX(${len * .9}px)`, opacity: 0 }],
+            { duration: 700, easing: "ease-out" }).onfinish = () => w.remove();
+    }, k * 90);
+}
+
+async function mb1(r) {   // 飛到最後面的孩子旁邊說加油
+    const i = rearOwl(); if (i < 0) return;
+    const p = svgToScreen(owlXY(i));
+    if (!await mFly(p.x - 75, p.y - 30, r)) return;
+    mDir(1); mFace("e-happy m-open"); MSFX.coo(); mSay(`${i + 1} 號寶貝，加油！快回家！`); momSpeak("加油！");
+    fxEmoji(p.x - 40, p.y - 40, ["💪", "✨", "💜"], 6);
+    await mWait(2800, r); mFace("");
+}
+async function mb2(r) {   // 飛去擋太陽
+    const s = sunXY();
+    if (!await mFly(s.x + 20, s.y, r)) return;
+    mAct("spread"); mFace("m-open"); mSay("我來擋住太陽！不准照到孩子們！"); MSFX.coo();
+    await mWait(3200, r); mFace("");
+}
+async function mb3(r) {   // 到巢穴親吻已到家的孩子
+    const home = G.owls.map((o, i) => o === "nest" ? i : -1).filter(i => i >= 0); if (!home.length) return;
+    const i = home[Math.floor(Math.random() * home.length)], p = svgToScreen(nestSeats()[i]);
+    if (!await mFly(p.x + 45, p.y - 40, r)) return;
+    mDir(-1); mFace("e-closed"); mSay(`啾～${i + 1} 號乖孩子，你回家了！`); momSpeak("乖孩子，你回家了！");
+    for (let k = 0; k < 3; k++) { if (!mAlive(r)) return; MSFX.kiss(); fxEmoji(p.x + 10, p.y - 30, ["💗", "💕", "💋"], 4, 70); await mWait(600, r); }
+    await mWait(1200, r); mFace("");
+}
+async function mb4(r) {   // 從起點沿路線飛到最後面孩子的後方喊加油
+    const i = rearOwl(); if (i < 0) return;
+    const end = G.owls[i];
+    let p = svgToScreen(slotXY[0]);
+    if (!await mFly(p.x, p.y - 45, r)) return;
+    mSay("跟著路線飛～", 1500);
+    for (let k = 1; k < end; k++) { p = svgToScreen(slotXY[k]); if (!await mFly(p.x, p.y - 45, r, 700)) return; }
+    const q = svgToScreen(owlXY(i));
+    mFace("e-happy m-open"); MSFX.coo(); mSay(`${i + 1} 號！加油！加油！快跑！`); momSpeak("加油加油！快跑！");
+    fxEmoji(q.x, q.y - 30, ["📣", "💪", "✨"], 6);
+    await mWait(2600, r); mFace("");
+}
+async function mb5(r) {   // 對太陽搧翅膀
+    const s = sunXY();
+    if (!await mFly(s.x + 130, s.y, r)) return;
+    mDir(-1); mAct("fan"); mFace("m-open"); mSay("下去！下去！太陽快下去！");
+    for (let k = 0; k < 4; k++) { if (!mAlive(r)) return; MSFX.wind(); windTo(MOM.x - 40, MOM.y, s.x, s.y, 6); await mWait(800, r); }
+    mFace("");
+}
+async function mb6(r) {   // 米字型飛過整個畫面，最後停下喘氣
+    const b = $("board-area").getBoundingClientRect(), m = 70;
+    const L = b.left + m, R = b.right - m, T = b.top + m, B = b.bottom - m, cx = (L + R) / 2, cy = (T + B) / 2;
+    const pts = [[L, cy], [R, cy], [cx, T], [cx, B], [L, T], [R, B], [R, T], [L, B], [cx, cy]];
+    mSay("呼～咻～咻～！", 1500);
+    for (const [x, y] of pts) if (!await mFly(x, y, r, 950)) return;
+    mAct("pant"); mFace("e-closed m-open"); mSay("呼…呼…好累喔……");
+    for (let k = 0; k < 5; k++) { if (!mAlive(r)) return; MSFX.pant(); await mWait(500, r); }
+    mFace("");
+}
+async function mb7(r) {   // 學啄木鳥啄外圈圓圈
+    const free = []; for (let k = NSTART; k < NSTART + 22; k++) if (!G.owls.includes(k)) free.push(k);
+    const k = free[Math.floor(Math.random() * free.length)], p = svgToScreen(slotXY[k]);
+    const sc = $("board").getScreenCTM().a;
+    if (!await mFly(p.x - 31 * sc - MOM.W * .42, p.y + 12, r)) return;
+    mDir(1); mAct("side-view peck"); mSay("叩叩叩！啄木鳥媽媽來啦！");
+    for (let n = 0; n < 9; n++) {
+        if (!mAlive(r)) return;
+        MSFX.ding();
+        const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        c.setAttribute("cx", slotXY[k].x); c.setAttribute("cy", slotXY[k].y); c.setAttribute("r", 31); c.setAttribute("fill", "none"); c.setAttribute("stroke", "#fff"); c.setAttribute("stroke-width", 6);
+        $("layer-fx").appendChild(c);
+        c.animate([{ r: 31, opacity: 1 }, { r: 52, opacity: 0 }], { duration: 400 }).onfinish = () => c.remove();
+        await mWait(320, r);
+    }
+    mAct("hover");
+}
+async function mb8(r) {   // 對孩子搧翅膀，想把他吹回家
+    const live = G.owls.map((o, i) => o !== "nest" ? i : -1).filter(i => i >= 0); if (!live.length) return;
+    const i = live[Math.floor(Math.random() * live.length)];
+    const o = svgToScreen(owlXY(i)), n = svgToScreen({ x: CX, y: CY });
+    const dx = o.x - n.x, dy = o.y - n.y, d = Math.hypot(dx, dy) || 1;
+    if (!await mFly(o.x + dx / d * 110, o.y + dy / d * 110, r)) return;
+    mDir(-dx); mAct("fan"); mFace("m-open"); mSay(`呼～呼～${i + 1} 號飛回家吧！`);
+    for (let k = 0; k < 4; k++) { if (!mAlive(r)) return; MSFX.wind(); windTo(MOM.x, MOM.y, o.x - dx / d * 60, o.y - dy / d * 60, 6); await mWait(800, r); }
+    mFace("");
+}
+const MOM_BEH = [mb1, mb2, mb3, mb4, mb5, mb6, mb7, mb8];
+async function momLoop() {
+    while (MOM.active) {
+        if (MOM.drag || G.over) { await sleep(400); continue; }
+        const r = MOM.run;
+        let k; do { k = Math.floor(Math.random() * MOM_BEH.length); } while (k === MOM.last);
+        MOM.last = k;
+        try { await MOM_BEH[k](r); } catch (e) {}
+        if (r !== MOM.run) continue;
+        mAct("hover"); mFace("");
+        if (++MOM.n % 4 === 0 && mAlive(r)) { mSay("孩子們！快回家啊！我們不能曬到太陽！", 2600); momSpeak("孩子們！快回家啊！我們不能曬到太陽！"); }
+        await mWait(2500 + Math.random() * 2500, r);
+    }
+}
+/* 拎起來 */
+let mAngry = null;
+function momGrab(e) {
+    e.preventDefault(); ensureAudio();
+    MOM.run++; MOM.drag = true;
+    mAct("drag"); mFace("m-open"); mDir(1); MOM.el.classList.add("dragging");
+    MSFX.oops(); mSay("哎呀！放我下來！我要去照顧孩子！");
+    mAngry = setInterval(() => { MSFX.oops(); mSay(["哎呀呀！", "放我下來啦～", "我的裙子要皺了！"][Math.floor(Math.random() * 3)]); }, 1500);
+    momMove(e);
+    window.addEventListener("pointermove", momMove); window.addEventListener("pointerup", momDrop);
+}
+function momMove(e) { mPlace(e.clientX, e.clientY + MOM.H * .4); }
+async function momDrop() {
+    clearInterval(mAngry);
+    window.removeEventListener("pointermove", momMove); window.removeEventListener("pointerup", momDrop);
+    MOM.el.classList.remove("dragging"); mAct("hover"); mFace("e-closed"); mSay("哼！我還要去幫孩子們！", 1600);
+    await sleep(1600); mFace(""); MOM.drag = false;
+}
+function startMom() {
+    if (MOM.active || G.over) return;
+    MOM.W = Math.max(100, Math.min(150, innerWidth * .075)); MOM.H = MOM.W * 1.12;
+    MOM.el = document.createElement("div"); MOM.el.id = "mom"; MOM.el.style.setProperty("--mw", MOM.W + "px");
+    MOM.el.innerHTML = `<div class="bub"></div><div class="flip">${momSVG()}</div>`;
+    document.body.appendChild(MOM.el);
+    MOM.el.addEventListener("pointerdown", momGrab);
+    MOM.active = true;
+    const b = $("board-area").getBoundingClientRect();
+    mPlace(innerWidth + MOM.W, innerHeight + MOM.H);
+    (async () => {
+        const r = MOM.run;
+        await mFly(b.right - MOM.W * .9, b.bottom - MOM.H * .8, r, 420);
+        if (mAlive(r)) { mFace("m-open"); MSFX.coo(); mSay("孩子們！快回家啊！我們不能曬到太陽！", 3200); momSpeak("孩子們！快回家啊！我們不能曬到太陽！"); await mWait(3400, r); mFace(""); }
+        momLoop();
+    })();
+}
+</script>
+</body>
+</html>
